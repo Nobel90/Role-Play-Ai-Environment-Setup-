@@ -28,10 +28,10 @@ if (!app.isPackaged) {
  */
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    minWidth: 600,
-    minHeight: 450,
+    width: 1280,
+    height: 880,
+    minWidth: 1280,
+    minHeight: 880,
     title: 'VRC Character Updater',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -40,7 +40,7 @@ function createWindow() {
       sandbox: false
     },
     icon: (() => {
-      const iconPath = path.join(__dirname, '../../assets/icons/icon.png');
+      const iconPath = path.join(__dirname, '../../assets/icons/icon-white_s.ico');
       return fs.existsSync(iconPath) ? iconPath : undefined;
     })()
   });

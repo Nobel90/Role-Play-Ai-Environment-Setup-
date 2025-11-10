@@ -13,7 +13,7 @@
         <header class="header">
             <h1 class="title">VRC Character Updater</h1>
             <div class="header-actions">
-                <button id="viewModeBtn" class="btn btn-info">📋 Visual Mode</button>
+                <button id="viewModeBtn" class="btn btn-info">JSON Mode</button>
                 <button id="reloadBtn" class="btn btn-secondary">Reload JSON</button>
             </div>
         </header>
@@ -21,7 +21,7 @@
         <!-- Main Content -->
         <main class="main-content">
             <!-- Visual Mode: Scenario Management -->
-            <div id="visualMode" class="view-mode hidden">
+            <div id="visualMode" class="view-mode">
                 <div class="scenarios-header">
                     <h2>Scenarios</h2>
                     <div class="header-controls">
@@ -37,7 +37,7 @@
             </div>
 
             <!-- JSON Mode: Raw JSON Editor -->
-            <div id="jsonMode" class="view-mode">
+            <div id="jsonMode" class="view-mode hidden">
                 <textarea 
                     id="jsonTextArea" 
                     class="json-editor" 

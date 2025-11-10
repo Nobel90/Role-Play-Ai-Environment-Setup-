@@ -79,11 +79,13 @@ const cancelScenarioBtn = document.getElementById('cancelScenarioBtn');
 const saveScenarioBtn = document.getElementById('saveScenarioBtn');
 
 // State
-let currentViewMode = 'json'; // 'json' or 'visual'
+let currentViewMode = 'visual'; // 'json' or 'visual'
 let currentJsonData = null;
-let editingScenarioIndex = null;
+let editingScenarioColumn = null;
+let editingScenarioRow = null;
 let gridColumns = 2; // Default 2-column grid (can be increased)
-let draggedCardIndex = null;
+let draggedCardColumn = null;
+let draggedCardRow = null;
 let draggedCardElement = null;
 let minGridRows = 0; // Minimum number of rows to display (for empty slots)
 let minGridCols = 2; // Minimum number of columns to display (for empty slots)
@@ -389,7 +391,7 @@ function renderScenarios() {
       
       if (scenario) {
         // Slot with scenario card
-        const scenarioIndex = scenarios.indexOf(scenario);
+        // Use grid position to identify scenario uniquely instead of array index
         const title = scenario.title || scenario.name || 'Untitled Scenario';
         const characterId = scenario.characterId || 'Unknown';
         const environmentValue = scenario.environment || '';
@@ -403,20 +405,20 @@ function renderScenarios() {
                ondragenter="handleDragEnter(event)" 
                ondragleave="handleDragLeave(event)">
             <div class="scenario-card" draggable="true" 
-                 data-scenario-index="${scenarioIndex}"
-                 ondragstart="handleDragStart(event, ${scenarioIndex})" 
+                 data-scenario-column="${col}"
+                 data-scenario-row="${row}"
+                 ondragstart="handleDragStart(event, ${col}, ${row})" 
                  ondragend="handleDragEnd(event)">
               <div class="scenario-card-header">
-                <div>
-                  <h3 class="scenario-card-title">${escapeHtml(title)}</h3>
-                  <p class="scenario-card-character">Character ID: ${escapeHtml(characterId)}</p>
-                </div>
+                <h3 class="scenario-card-title">${escapeHtml(title)}</h3>
                 <div class="scenario-card-actions">
-                  <button class="btn btn-secondary btn-icon" onclick="editScenario(${scenarioIndex})">✏️ Edit</button>
-                  <button class="btn btn-danger btn-icon" onclick="deleteScenario(${scenarioIndex})">🗑️ Delete</button>
+                  <button class="btn-card-action" onclick="duplicateScenario(${col}, ${row})" title="Duplicate scenario">Duplicate</button>
+                  <button class="btn-card-action" onclick="editScenario(${col}, ${row})" title="Edit scenario">Edit</button>
+                  <button class="btn-card-action btn-card-action-danger" onclick="deleteScenario(${col}, ${row})" title="Delete scenario">Delete</button>
                 </div>
               </div>
               <div class="scenario-card-body">
+                <p class="scenario-card-info"><strong>Character ID:</strong> ${escapeHtml(characterId)}</p>
                 <p class="scenario-card-info"><strong>Environment:</strong> ${escapeHtml(environment)}</p>
                 ${greeting ? `<p class="scenario-card-info"><strong>Greeting:</strong> ${escapeHtml(greeting)}</p>` : '<p class="scenario-card-info"><em>No greeting set</em></p>'}
               </div>
@@ -466,28 +468,30 @@ function toggleViewMode() {
     currentViewMode = 'visual';
     jsonMode.classList.add('hidden');
     visualMode.classList.remove('hidden');
-    viewModeBtn.textContent = '📝 JSON Mode';
+    viewModeBtn.textContent = 'JSON Mode';
     renderScenarios();
   } else {
     // Switch to JSON mode
     currentViewMode = 'json';
     visualMode.classList.add('hidden');
     jsonMode.classList.remove('hidden');
-    viewModeBtn.textContent = '📋 Visual Mode';
+    viewModeBtn.textContent = 'Visual Mode';
   }
 }
 
 /**
  * Open modal to add/edit scenario
- * @param {number|null} index - Index of scenario to edit, or null for new scenario
+ * @param {number|null} column - Column of scenario to edit, or null for new scenario
+ * @param {number|null} row - Row of scenario to edit, or null for new scenario
  */
-function openScenarioModal(index = null) {
-  editingScenarioIndex = index;
+function openScenarioModal(column = null, row = null) {
+  editingScenarioColumn = column;
+  editingScenarioRow = row;
   
-  if (index !== null) {
+  if (column !== null && row !== null) {
     // Edit mode
     const scenarios = parseScenarios(currentJsonData);
-    const scenario = scenarios[index];
+    const scenario = getScenarioAtPosition(scenarios, column, row);
     modalTitle.textContent = 'Edit Scenario';
     
     // Populate form fields - use normalized fields (parseScenarios already normalized them)
@@ -530,7 +534,8 @@ function openScenarioModal(index = null) {
  */
 function closeScenarioModal() {
   scenarioModal.classList.add('hidden');
-  editingScenarioIndex = null;
+  editingScenarioColumn = null;
+  editingScenarioRow = null;
   scenarioForm.reset();
 }
 
@@ -602,14 +607,34 @@ function saveScenario() {
     }
   });
   
-  if (editingScenarioIndex !== null) {
+  if (editingScenarioColumn !== null && editingScenarioRow !== null) {
     // Update existing scenario - preserve original field name capitalization
-    const originalScenario = originalScenarios[editingScenarioIndex];
+    // Find the original scenario by grid position
+    const hasCapitalizedFields = originalScenarios.length > 0 && 
+                          (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
     
-    if (!originalScenario) {
+    let originalScenario = null;
+    let originalIndex = -1;
+    if (hasCapitalizedFields) {
+      originalIndex = originalScenarios.findIndex(s => {
+        const sCol = s.Column !== undefined ? s.Column : 0;
+        const sRow = s.Row !== undefined ? s.Row : 0;
+        return sCol === editingScenarioColumn && sRow === editingScenarioRow;
+      });
+    } else {
+      originalIndex = originalScenarios.findIndex(s => {
+        const sCol = s.column !== undefined ? s.column : 0;
+        const sRow = s.row !== undefined ? s.row : 0;
+        return sCol === editingScenarioColumn && sRow === editingScenarioRow;
+      });
+    }
+    
+    if (originalIndex === -1) {
       showStatus('❌ Error: Scenario not found', 'error');
       return;
     }
+    
+    originalScenario = originalScenarios[originalIndex];
     
     // Determine which field names to use (preserve original capitalization if it exists)
     const useCapitalized = originalScenario.Title !== undefined || originalScenario.CharacterID !== undefined;
@@ -702,22 +727,156 @@ function saveScenario() {
   displayJson(newJsonData);
   
   closeScenarioModal();
-  showStatus(editingScenarioIndex !== null ? '✅ Scenario updated' : '✅ Scenario added');
+  showStatus(editingScenarioColumn !== null && editingScenarioRow !== null ? '✅ Scenario updated' : '✅ Scenario added');
 }
 
 /**
  * Edit scenario
- * @param {number} index - Index of scenario to edit
+ * @param {number} column - Column of scenario to edit
+ * @param {number} row - Row of scenario to edit
  */
-function editScenario(index) {
-  openScenarioModal(index);
+function editScenario(column, row) {
+  openScenarioModal(column, row);
+}
+
+/**
+ * Duplicate scenario to a new slot
+ * @param {number} column - Column of scenario to duplicate
+ * @param {number} row - Row of scenario to duplicate
+ */
+function duplicateScenario(column, row) {
+  if (!currentJsonData) {
+    showStatus('⚠️ Please load JSON data first', 'error');
+    return;
+  }
+  
+  // Get original scenarios to preserve structure
+  let originalScenarios = [];
+  let isArrayStructure = false;
+  
+  if (Array.isArray(currentJsonData)) {
+    originalScenarios = deepClone(currentJsonData);
+    isArrayStructure = true;
+  } else if (currentJsonData && currentJsonData.scenarios) {
+    originalScenarios = deepClone(currentJsonData.scenarios);
+  }
+  
+  // Find the original scenario by grid position
+  const useCapitalized = originalScenarios.length > 0 && 
+                        (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
+  
+  let originalScenario = null;
+  if (useCapitalized) {
+    originalScenario = originalScenarios.find(s => {
+      const sCol = s.Column !== undefined ? s.Column : 0;
+      const sRow = s.Row !== undefined ? s.Row : 0;
+      return sCol === column && sRow === row;
+    });
+  } else {
+    originalScenario = originalScenarios.find(s => {
+      const sCol = s.column !== undefined ? s.column : 0;
+      const sRow = s.row !== undefined ? s.row : 0;
+      return sCol === column && sRow === row;
+    });
+  }
+  
+  if (!originalScenario) {
+    showStatus('❌ Error: Scenario not found', 'error');
+    return;
+  }
+  
+  // Get current grid dimensions
+  const normalizedScenarios = parseScenarios(currentJsonData);
+  const { maxRow, actualColumns } = calculateGridDimensions(normalizedScenarios);
+  const totalCols = Math.max(actualColumns, minGridCols);
+  const totalRows = Math.max(maxRow + 1, minGridRows);
+  
+  // Find first empty slot
+  let emptySlot = findFirstEmptySlot(normalizedScenarios, totalRows, totalCols);
+  let targetColumn, targetRow;
+  
+  if (emptySlot) {
+    targetColumn = emptySlot.column;
+    targetRow = emptySlot.row;
+  } else {
+    // No empty slot found, add a new row
+    targetRow = totalRows;
+    targetColumn = 0;
+    minGridRows = totalRows + 1;
+  }
+  
+  // Calculate ButtonIndex
+  const buttonIndex = targetRow * totalCols + targetColumn;
+  
+  // Create duplicate scenario
+  if (useCapitalized) {
+    const duplicatedScenario = {
+      Column: targetColumn,
+      Row: targetRow,
+      Title: originalScenario.Title || '',
+      CharacterID: originalScenario.CharacterID || '',
+      ButtonIndex: buttonIndex,
+      Environment: originalScenario.Environment || '',
+      Greeting: originalScenario.Greeting || ''
+    };
+    originalScenarios.push(duplicatedScenario);
+  } else {
+    const duplicatedScenario = {
+      id: `scenario-${Date.now()}`,
+      title: originalScenario.title || originalScenario.name || '',
+      characterId: originalScenario.characterId || originalScenario.characterID || originalScenario.character_id || originalScenario.character || '',
+      environment: originalScenario.environment || originalScenario.env || '',
+      greeting: originalScenario.greeting || originalScenario.greetingMessage || '',
+      column: targetColumn,
+      row: targetRow,
+      buttonIndex: buttonIndex
+    };
+    originalScenarios.push(duplicatedScenario);
+  }
+  
+  // Clean up normalized fields from all scenarios
+  originalScenarios = originalScenarios.map(s => {
+    const sUseCapitalized = s.Title !== undefined || s.CharacterID !== undefined;
+    if (sUseCapitalized) {
+      const clean = {};
+      if (s.Column !== undefined) clean.Column = s.Column;
+      if (s.Row !== undefined) clean.Row = s.Row;
+      if (s.Title !== undefined) clean.Title = s.Title;
+      if (s.CharacterID !== undefined) clean.CharacterID = s.CharacterID;
+      if (s.ButtonIndex !== undefined) clean.ButtonIndex = s.ButtonIndex;
+      if (s.Environment !== undefined) clean.Environment = s.Environment;
+      if (s.Greeting !== undefined) clean.Greeting = s.Greeting;
+      return clean;
+    } else {
+      const clean = { ...s };
+      // Remove normalized fields if they exist as duplicates
+      if (clean.title && clean.Title) delete clean.title;
+      if (clean.characterId && clean.CharacterID) delete clean.characterId;
+      if (clean.environment && clean.Environment) delete clean.environment;
+      if (clean.greeting && clean.Greeting) delete clean.greeting;
+      if (clean.column !== undefined && clean.Column !== undefined) delete clean.column;
+      if (clean.row !== undefined && clean.Row !== undefined) delete clean.row;
+      if (clean.buttonIndex !== undefined && clean.ButtonIndex !== undefined) delete clean.buttonIndex;
+      return clean;
+    }
+  });
+  
+  // Rebuild JSON structure
+  const newJsonData = isArrayStructure ? originalScenarios : { scenarios: originalScenarios };
+  currentJsonData = newJsonData;
+  
+  // Update JSON textarea
+  displayJson(newJsonData);
+  
+  showStatus('✅ Scenario duplicated successfully');
 }
 
 /**
  * Delete scenario
- * @param {number} index - Index of scenario to delete (normalized index)
+ * @param {number} column - Column of scenario to delete
+ * @param {number} row - Row of scenario to delete
  */
-function deleteScenario(index) {
+function deleteScenario(column, row) {
   if (!confirm('Are you sure you want to delete this scenario?')) {
     return;
   }
@@ -733,37 +892,28 @@ function deleteScenario(index) {
     originalScenarios = deepClone(currentJsonData.scenarios);
   }
   
-  // Get normalized scenarios to find the correct original scenario
-  const normalizedScenarios = parseScenarios(currentJsonData);
-  const scenarioToDelete = normalizedScenarios[index];
-  
-  if (!scenarioToDelete) {
-    showStatus('❌ Error: Scenario not found', 'error');
-    return;
-  }
-  
-  // Find the original scenario by matching key fields
+  // Find the original scenario by grid position
   const useCapitalized = originalScenarios.length > 0 && 
                         (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
   
   let originalIndex = -1;
   if (useCapitalized) {
     originalIndex = originalScenarios.findIndex(s => {
-      const sTitle = s.Title || '';
-      const sCharId = s.CharacterID || '';
-      return sTitle === scenarioToDelete.title && sCharId === scenarioToDelete.characterId;
+      const sCol = s.Column !== undefined ? s.Column : 0;
+      const sRow = s.Row !== undefined ? s.Row : 0;
+      return sCol === column && sRow === row;
     });
   } else {
     originalIndex = originalScenarios.findIndex(s => {
-      const sTitle = s.title || s.name || '';
-      const sCharId = s.characterId || s.characterID || s.character_id || s.character || '';
-      return sTitle === scenarioToDelete.title && sCharId === scenarioToDelete.characterId;
+      const sCol = s.column !== undefined ? s.column : 0;
+      const sRow = s.row !== undefined ? s.row : 0;
+      return sCol === column && sRow === row;
     });
   }
   
   if (originalIndex === -1) {
-    // Fallback: use index directly if matching fails
-    originalIndex = index;
+    showStatus('❌ Error: Scenario not found', 'error');
+    return;
   }
   
   // Remove the scenario
@@ -810,8 +960,9 @@ function deleteScenario(index) {
 /**
  * Handle drag start
  */
-function handleDragStart(event, scenarioIndex) {
-  draggedCardIndex = scenarioIndex;
+function handleDragStart(event, column, row) {
+  draggedCardColumn = column;
+  draggedCardRow = row;
   draggedCardElement = event.target.closest('.scenario-card');
   event.dataTransfer.effectAllowed = 'move';
   event.dataTransfer.setData('text/html', event.target.outerHTML);
@@ -827,7 +978,8 @@ function handleDragEnd(event) {
   document.querySelectorAll('.grid-slot').forEach(slot => {
     slot.classList.remove('drag-over');
   });
-  draggedCardIndex = null;
+  draggedCardColumn = null;
+  draggedCardRow = null;
   draggedCardElement = null;
 }
 
@@ -864,10 +1016,10 @@ function handleDrop(event, targetColumn, targetRow) {
   event.preventDefault();
   event.stopPropagation();
   
-  if (draggedCardIndex === null) return;
+  if (draggedCardColumn === null || draggedCardRow === null) return;
   
   const scenarios = parseScenarios(currentJsonData);
-  const scenario = scenarios[draggedCardIndex];
+  const scenario = getScenarioAtPosition(scenarios, draggedCardColumn, draggedCardRow);
   
   if (!scenario) return;
   
@@ -882,8 +1034,24 @@ function handleDrop(event, targetColumn, targetRow) {
     originalScenarios = deepClone(currentJsonData.scenarios);
   }
   
-  // Find the original scenario by index (before cleaning)
-  const originalScenario = originalScenarios[draggedCardIndex];
+  // Find the original scenario by grid position
+  const hasCapitalizedFields = originalScenarios.length > 0 && 
+                        (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
+  
+  let originalScenario = null;
+  if (hasCapitalizedFields) {
+    originalScenario = originalScenarios.find(s => {
+      const sCol = s.Column !== undefined ? s.Column : 0;
+      const sRow = s.Row !== undefined ? s.Row : 0;
+      return sCol === draggedCardColumn && sRow === draggedCardRow;
+    });
+  } else {
+    originalScenario = originalScenarios.find(s => {
+      const sCol = s.column !== undefined ? s.column : 0;
+      const sRow = s.row !== undefined ? s.row : 0;
+      return sCol === draggedCardColumn && sRow === draggedCardRow;
+    });
+  }
   
   if (!originalScenario) return;
   
@@ -1079,9 +1247,12 @@ function removeEmptySlot(column, row) {
   }
   
   // Check if this is the last row and we can reduce minGridRows
-  const { maxRow, actualColumns } = calculateGridDimensions(scenarios);
+  const { maxRow, maxCol, actualColumns } = calculateGridDimensions(scenarios);
   const totalCols = Math.max(actualColumns, minGridCols);
   const currentRows = Math.max(maxRow + 1, minGridRows);
+  
+  // Calculate the actual number of columns that have data (maxCol + 1)
+  const dataColumns = maxCol + 1;
   
   // If removing from the last row and it's empty, reduce minGridRows
   if (row === currentRows - 1) {
@@ -1100,13 +1271,26 @@ function removeEmptySlot(column, row) {
   }
   
   // Check if this is the last column and we can reduce minGridCols
-  if (column === totalCols - 1) {
+  // The last column is the one at index (totalCols - 1)
+  // We can reduce if: column is the last one AND it's beyond the data columns (meaning it's an extra column)
+  // Also check if we have more columns than needed (minGridCols > dataColumns)
+  if (column === totalCols - 1 && minGridCols > dataColumns) {
     // Check if the entire last column is empty
     let lastColEmpty = true;
-    for (let r = 0; r < currentRows; r++) {
+    // Check all rows up to the maximum row that has data
+    for (let r = 0; r <= maxRow; r++) {
       if (getScenarioAtPosition(scenarios, column, r)) {
         lastColEmpty = false;
         break;
+      }
+    }
+    // Also check any rows added via minGridRows
+    if (lastColEmpty && minGridRows > maxRow + 1) {
+      for (let r = maxRow + 1; r < currentRows; r++) {
+        if (getScenarioAtPosition(scenarios, column, r)) {
+          lastColEmpty = false;
+          break;
+        }
       }
     }
     
@@ -1179,6 +1363,7 @@ function refreshGrid() {
 // Make functions globally available for onclick handlers
 window.editScenario = editScenario;
 window.deleteScenario = deleteScenario;
+window.duplicateScenario = duplicateScenario;
 window.handleDragStart = handleDragStart;
 window.handleDragEnd = handleDragEnd;
 window.handleDragOver = handleDragOver;

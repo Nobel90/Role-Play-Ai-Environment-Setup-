@@ -1,6 +1,6 @@
 {
   "name": "role-play-ai-environment-setup",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "VRC Character Updater - Electron application for managing JSONBin API configuration",
   "main": "src/main/main.js",
   "scripts": {
@@ -59,7 +59,8 @@
           ]
         }
       ],
-      "artifactName": "${productName}-${version}-portable.${ext}"
+      "artifactName": "${productName}-${version}-portable.${ext}",
+      "icon": "assets/icons/icon-white_s.ico"
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"

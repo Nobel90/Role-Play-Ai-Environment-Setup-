@@ -34,6 +34,7 @@ win:
       arch:
         - x64
   artifactName: ${productName}-${version}-portable.${ext}
+  icon: assets/icons/icon-white_s.ico
 
 portable:
   artifactName: ${productName}-${version}-portable.${ext}
