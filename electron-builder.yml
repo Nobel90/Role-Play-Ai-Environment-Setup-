@@ -1,0 +1,38 @@
+appId: com.role-play-ai.environment-setup
+productName: VRC Character Updater
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - src/**/*
+  - package.json
+  - package-lock.json
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: assets/icons/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: VRC Character Updater
+  installerIcon: assets/icons/icon.ico
+  uninstallerIcon: assets/icons/icon.ico
+  installerHeaderIcon: assets/icons/icon.ico
+
+mac:
+  target: dmg
+  icon: assets/icons/icon.icns
+  category: public.app-category.utilities
+
+linux:
+  target: AppImage
+  icon: assets/icons/icon.png
+  category: Utility
+

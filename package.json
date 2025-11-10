@@ -1,0 +1,56 @@
+{
+  "name": "role-play-ai-environment-setup",
+  "version": "1.0.0",
+  "description": "VRC Character Updater - Electron application for managing JSONBin API configuration",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "dist": "electron-builder --publish=never"
+  },
+  "keywords": [
+    "electron",
+    "jsonbin",
+    "configuration",
+    "vrc"
+  ],
+  "author": "Nobel90",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nobel90/Role-Play-Ai-Environment-Setup-.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Nobel90/Role-Play-Ai-Environment-Setup-/issues"
+  },
+  "homepage": "https://github.com/Nobel90/Role-Play-Ai-Environment-Setup-#readme",
+  "dependencies": {
+    "axios": "^1.10.0",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "build": {
+    "appId": "com.role-play-ai.environment-setup",
+    "productName": "VRC Character Updater",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icons/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "VRC Character Updater"
+    }
+  }
+}
