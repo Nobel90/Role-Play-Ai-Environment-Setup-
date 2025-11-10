@@ -127,18 +127,6 @@ function displayJson(data) {
     const formatted = formatJson(data, 4);
     jsonTextArea.value = formatted;
     
-    // Debug: Log raw JSON data structure
-    console.log('Raw JSON data received:', data);
-    if (data && typeof data === 'object') {
-      console.log('JSON keys:', Object.keys(data));
-      if (data.scenarios) {
-        console.log('Scenarios array length:', data.scenarios.length);
-        if (data.scenarios.length > 0) {
-          console.log('First scenario raw data:', data.scenarios[0]);
-          console.log('First scenario keys:', Object.keys(data.scenarios[0]));
-        }
-      }
-    }
     
     // Update visual mode if active
     if (currentViewMode === 'visual') {
@@ -305,23 +293,10 @@ function renderScenarios() {
   }
   
   // Check for missing fields and prompt user
-  // Debug: Log first scenario to see what fields are present
-  if (scenarios.length > 0) {
-    console.log('First scenario data:', scenarios[0]);
-    console.log('First scenario normalized fields:', {
-      title: scenarios[0].title || scenarios[0].name,
-      characterId: scenarios[0].characterId,
-      environment: scenarios[0].environment,
-      greeting: scenarios[0].greeting
-    });
-  }
-  
   const scenariosWithMissingFields = checkMissingFields(scenarios);
   if (scenariosWithMissingFields.length > 0) {
     const missingCount = scenariosWithMissingFields.length;
     const fieldsList = [...new Set(scenariosWithMissingFields.flatMap(s => s.missingFields))].join(', ');
-    // Debug: Log which scenarios have missing fields
-    console.log('Scenarios with missing fields:', scenariosWithMissingFields);
     showStatus(`⚠️ ${missingCount} scenario(s) have missing required fields (${fieldsList}). Please edit them to fill in the missing information.`, 'error');
   }
   
