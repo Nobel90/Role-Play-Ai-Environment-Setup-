@@ -12,18 +12,81 @@
         <!-- Header -->
         <header class="header">
             <h1 class="title">VRC Character Updater</h1>
-            <button id="reloadBtn" class="btn btn-secondary">Reload JSON</button>
+            <div class="header-actions">
+                <button id="viewModeBtn" class="btn btn-info">📋 Visual Mode</button>
+                <button id="reloadBtn" class="btn btn-secondary">Reload JSON</button>
+            </div>
         </header>
 
         <!-- Main Content -->
         <main class="main-content">
-            <textarea 
-                id="jsonTextArea" 
-                class="json-editor" 
-                placeholder="JSON data will appear here..."
-                spellcheck="false"
-            ></textarea>
+            <!-- Visual Mode: Scenario Management -->
+            <div id="visualMode" class="view-mode hidden">
+                <div class="scenarios-header">
+                    <h2>Scenarios</h2>
+                    <button id="addScenarioBtn" class="btn btn-success">+ Add Scenario</button>
+                </div>
+                <div id="scenariosList" class="scenarios-list">
+                    <!-- Scenarios will be dynamically added here -->
+                </div>
+            </div>
+
+            <!-- JSON Mode: Raw JSON Editor -->
+            <div id="jsonMode" class="view-mode">
+                <textarea 
+                    id="jsonTextArea" 
+                    class="json-editor" 
+                    placeholder="JSON data will appear here..."
+                    spellcheck="false"
+                ></textarea>
+            </div>
         </main>
+
+        <!-- Scenario Modal -->
+        <div id="scenarioModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalTitle">Add Scenario</h3>
+                    <button id="closeModalBtn" class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="scenarioForm">
+                        <div class="form-group">
+                            <label for="scenarioTitle">Title *</label>
+                            <input type="text" id="scenarioTitle" class="form-input" required 
+                                   placeholder="e.g., Having Difficult Conversations">
+                        </div>
+                        <div class="form-group">
+                            <label for="scenarioCharacterId">Character ID *</label>
+                            <input type="text" id="scenarioCharacterId" class="form-input" required 
+                                   placeholder="Convai Character ID">
+                        </div>
+                        <div class="form-group">
+                            <label for="scenarioEnvironment">Environment *</label>
+                            <select id="scenarioEnvironment" class="form-input form-select" required>
+                                <option value="">Select an environment...</option>
+                                <option value="Hospital - Betty">Hospital - Betty</option>
+                                <option value="Hospital - Joshua">Hospital - Joshua</option>
+                                <option value="Hospital - David">Hospital - David</option>
+                                <option value="Hospital - Rachael">Hospital - Rachael</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="scenarioGreeting">Greeting *</label>
+                            <textarea id="scenarioGreeting" class="form-textarea" rows="3" required
+                                      placeholder="AI greeting message when experience starts"></textarea>
+                        </div>
+                        <div class="form-note">
+                            <small>Note: Column, Row, and Button Index are auto-generated based on position.</small>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="cancelScenarioBtn" class="btn btn-secondary">Cancel</button>
+                            <button type="submit" id="saveScenarioBtn" class="btn btn-success">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
 
         <!-- Footer with Actions -->
         <footer class="footer">
