@@ -99,6 +99,7 @@ body {
     padding: 10px 20px;
     display: flex;
     justify-content: space-between;
+    gap: 10px;
     border-top: 1px solid var(--border-color);
     flex-shrink: 0;
 }

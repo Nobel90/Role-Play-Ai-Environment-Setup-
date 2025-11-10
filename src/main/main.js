@@ -7,7 +7,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { fetchJson, uploadJson } = require('../api/jsonbin-client');
-const { readJsonFile, validateJson } = require('../utils/file-handler');
+const { readJsonFile, writeJsonFile, validateJson } = require('../utils/file-handler');
 
 let mainWindow;
 
@@ -96,6 +96,35 @@ ipcMain.handle('load-from-file', async () => {
     return { success: true, data };
   } catch (error) {
     console.error('Load file error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * Handle save to file request from renderer
+ */
+ipcMain.handle('save-to-file', async (event, jsonString) => {
+  try {
+    // Validate JSON before saving
+    const parsedData = validateJson(jsonString);
+    
+    const result = await dialog.showSaveDialog(mainWindow, {
+      filters: [
+        { name: 'JSON Files', extensions: ['json'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      defaultPath: 'config.json'
+    });
+
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+
+    const filePath = result.filePath;
+    await writeJsonFile(filePath, parsedData, 4);
+    return { success: true, filePath };
+  } catch (error) {
+    console.error('Save file error:', error);
     return { success: false, error: error.message };
   }
 });

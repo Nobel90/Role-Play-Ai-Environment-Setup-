@@ -7,9 +7,10 @@ An Electron desktop application for managing JSON configuration data through the
 - 🔄 **Fetch JSON** - Load JSON data from JSONBin API
 - ✏️ **Edit JSON** - Edit JSON data in a formatted text editor
 - 💾 **Load from File** - Import JSON from local files
+- 💾 **Save to File** - Export JSON to local files
 - ⬆️ **Upload to JSONBin** - Save changes back to JSONBin API
 - 🎨 **Dark Theme** - Modern dark UI matching ttkbootstrap darkly style
-- ✅ **JSON Validation** - Automatic validation before upload
+- ✅ **JSON Validation** - Automatic validation before upload and save
 
 ## Prerequisites
 
@@ -143,8 +144,9 @@ Role-Play-Ai-Environment-Setup/
 1. **Launch the application** - The app will automatically fetch JSON from the configured JSONBin endpoint
 2. **Edit JSON** - Modify the JSON data in the text editor
 3. **Load from File** - Click "Load from File" to import JSON from a local file
-4. **Upload** - Click "Upload to JSONBin" to save your changes
-5. **Reload** - Click "Reload JSON" to fetch the latest data from the server
+4. **Save to File** - Click "Save to File" to export JSON to a local file
+5. **Upload** - Click "Upload to JSONBin" to save your changes to the remote storage
+6. **Reload** - Click "Reload JSON" to fetch the latest data from the server
 
 ## Security
 

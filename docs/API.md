@@ -108,6 +108,15 @@ Opens a file dialog and loads JSON from a selected file.
 
 **Returns:** `Promise<{success: boolean, data?: Object, error?: string, canceled?: boolean}>`
 
+#### `save-to-file`
+
+Opens a save dialog and saves JSON to a selected file.
+
+**Parameters:**
+- `jsonString` (string) - JSON string to save
+
+**Returns:** `Promise<{success: boolean, filePath?: string, error?: string, canceled?: boolean}>`
+
 ### Renderer Process API
 
 The renderer process accesses these handlers through `window.electronAPI`:
@@ -121,6 +130,9 @@ const result = await window.electronAPI.uploadJson(jsonString);
 
 // Load from file
 const result = await window.electronAPI.loadFromFile();
+
+// Save to file
+const result = await window.electronAPI.saveToFile(jsonString);
 ```
 
 ## File Handler Utilities

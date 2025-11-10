@@ -22,6 +22,7 @@ function formatJson(data, indent = 4) {
 const jsonTextArea = document.getElementById('jsonTextArea');
 const reloadBtn = document.getElementById('reloadBtn');
 const loadFileBtn = document.getElementById('loadFileBtn');
+const saveFileBtn = document.getElementById('saveFileBtn');
 const uploadBtn = document.getElementById('uploadBtn');
 const statusMessage = document.getElementById('statusMessage');
 
@@ -145,10 +146,54 @@ async function handleLoadFromFile() {
   }
 }
 
+/**
+ * Handle save JSON to file
+ */
+async function handleSaveToFile() {
+  const jsonString = jsonTextArea.value.trim();
+  
+  if (!jsonString) {
+    showStatus('⚠️ Please paste or load JSON first.', 'error');
+    return;
+  }
+  
+  // Validate JSON before saving
+  try {
+    JSON.parse(jsonString);
+  } catch (error) {
+    showStatus(`❌ Invalid JSON: ${error.message}`, 'error');
+    return;
+  }
+  
+  try {
+    saveFileBtn.disabled = true;
+    saveFileBtn.textContent = 'Saving...';
+    
+    const result = await window.electronAPI.saveToFile(jsonString);
+    
+    if (result.canceled) {
+      // User canceled file dialog
+      return;
+    }
+    
+    if (result.success) {
+      showStatus(`✅ File saved successfully`);
+    } else {
+      showStatus(`❌ Save failed: ${result.error}`, 'error');
+    }
+  } catch (error) {
+    showStatus(`❌ Error: ${error.message}`, 'error');
+  } finally {
+    saveFileBtn.disabled = false;
+    saveFileBtn.textContent = '💾 Save to File';
+  }
+}
+
 // Event Listeners
 reloadBtn.addEventListener('click', handleFetchJson);
 uploadBtn.addEventListener('click', handleUploadJson);
 loadFileBtn.addEventListener('click', handleLoadFromFile);
+saveFileBtn.addEventListener('click', handleSaveToFile);
 
 // Load JSON on startup
 window.addEventListener('DOMContentLoaded', () => {

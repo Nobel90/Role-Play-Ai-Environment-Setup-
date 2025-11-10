@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // File operations
   loadFromFile: () => ipcRenderer.invoke('load-from-file'),
+  saveToFile: (data) => ipcRenderer.invoke('save-to-file', data),
   
   // Error handling
   onError: (callback) => ipcRenderer.on('error', (event, error) => callback(error)),
