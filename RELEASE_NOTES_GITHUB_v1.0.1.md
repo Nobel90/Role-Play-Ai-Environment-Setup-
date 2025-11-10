@@ -12,7 +12,7 @@
 
 ## 📦 Build
 - Custom application icon
-- Minimum window size: 1280x720
+- Minimum window size: 1280x880
 - Portable executable optimized
 
 ## 🔄 Auto-Update Ready

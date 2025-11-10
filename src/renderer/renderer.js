@@ -54,6 +54,7 @@ function formatJson(data, indent = 4) {
 // DOM Elements
 const jsonTextArea = document.getElementById('jsonTextArea');
 const reloadBtn = document.getElementById('reloadBtn');
+const checkUpdatesBtn = document.getElementById('checkUpdatesBtn');
 const loadFileBtn = document.getElementById('loadFileBtn');
 const saveFileBtn = document.getElementById('saveFileBtn');
 const uploadBtn = document.getElementById('uploadBtn');
@@ -1513,8 +1514,39 @@ async function handleSaveToFile() {
   }
 }
 
+/**
+ * Handle manual update check
+ */
+async function handleCheckForUpdates() {
+  checkUpdatesBtn.disabled = true;
+  checkUpdatesBtn.textContent = 'Checking...';
+  
+  try {
+    const result = await window.electronAPI.checkForUpdates();
+    
+    if (result.success) {
+      if (result.updateInfo.hasUpdate) {
+        showUpdateModal(result.updateInfo);
+        showStatus('✅ Update available!', 'success');
+      } else {
+        showStatus(`✅ You're running the latest version (${result.updateInfo.currentVersion})`, 'success');
+      }
+    } else {
+      showStatus(`❌ Update check failed: ${result.error}`, 'error');
+      console.error('Update check error:', result.error);
+    }
+  } catch (error) {
+    showStatus(`❌ Error: ${error.message}`, 'error');
+    console.error('Update check exception:', error);
+  } finally {
+    checkUpdatesBtn.disabled = false;
+    checkUpdatesBtn.textContent = 'Check for Updates';
+  }
+}
+
 // Event Listeners
 reloadBtn.addEventListener('click', handleFetchJson);
+checkUpdatesBtn.addEventListener('click', handleCheckForUpdates);
 uploadBtn.addEventListener('click', handleUploadJson);
 loadFileBtn.addEventListener('click', handleLoadFromFile);
 saveFileBtn.addEventListener('click', handleSaveToFile);
@@ -1550,5 +1582,162 @@ window.electronAPI.onError((error) => {
 // Listen for success messages from main process
 window.electronAPI.onSuccess((message) => {
   showStatus(message, 'success');
+});
+
+// Update Modal Elements
+const updateModal = document.getElementById('updateModal');
+const updateModalTitle = document.getElementById('updateModalTitle');
+const closeUpdateModalBtn = document.getElementById('closeUpdateModalBtn');
+const cancelUpdateBtn = document.getElementById('cancelUpdateBtn');
+const downloadUpdateBtn = document.getElementById('downloadUpdateBtn');
+const openDownloadsBtn = document.getElementById('openDownloadsBtn');
+const currentVersionSpan = document.getElementById('currentVersion');
+const latestVersionSpan = document.getElementById('latestVersion');
+const updateReleaseNotes = document.getElementById('updateReleaseNotes');
+const updateDownloadProgress = document.getElementById('updateDownloadProgress');
+const updateProgressBar = document.getElementById('updateProgressBar');
+const updateProgressText = document.getElementById('updateProgressText');
+const updateDownloaded = document.getElementById('updateDownloaded');
+const updateInfoDiv = document.getElementById('updateInfo');
+
+let currentUpdateInfo = null;
+
+/**
+ * Show update modal
+ */
+function showUpdateModal(updateInfo) {
+  currentUpdateInfo = updateInfo;
+  currentVersionSpan.textContent = updateInfo.currentVersion;
+  latestVersionSpan.textContent = updateInfo.latestVersion;
+  
+  // Format release notes (convert markdown-like text to HTML)
+  if (updateInfo.releaseNotes) {
+    const notes = updateInfo.releaseNotes
+      .split('\n')
+      .map(line => {
+        // Convert markdown headers
+        if (line.startsWith('## ')) {
+          return `<h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">${line.substring(3)}</h4>`;
+        }
+        if (line.startsWith('### ')) {
+          return `<h5 style="margin-top: 0.75rem; margin-bottom: 0.25rem;">${line.substring(4)}</h5>`;
+        }
+        // Convert bullet points
+        if (line.trim().startsWith('- ')) {
+          return `<li>${line.substring(2)}</li>`;
+        }
+        // Regular paragraph
+        if (line.trim()) {
+          return `<p style="margin: 0.25rem 0;">${line}</p>`;
+        }
+        return '';
+      })
+      .filter(line => line)
+      .join('');
+    
+    updateReleaseNotes.innerHTML = notes || '<p>No release notes available.</p>';
+  } else {
+    updateReleaseNotes.innerHTML = '<p>No release notes available.</p>';
+  }
+  
+  // Reset UI state
+  updateDownloadProgress.classList.add('hidden');
+  updateDownloaded.classList.add('hidden');
+  openDownloadsBtn.classList.add('hidden');
+  downloadUpdateBtn.classList.remove('hidden');
+  downloadUpdateBtn.disabled = false;
+  updateInfoDiv.classList.remove('hidden');
+  
+  updateModal.classList.remove('hidden');
+}
+
+/**
+ * Close update modal
+ */
+function closeUpdateModal() {
+  updateModal.classList.add('hidden');
+  currentUpdateInfo = null;
+}
+
+/**
+ * Handle download update
+ */
+async function handleDownloadUpdate() {
+  if (!currentUpdateInfo || !currentUpdateInfo.downloadUrl) {
+    showStatus('❌ Download URL not available', 'error');
+    return;
+  }
+  
+  downloadUpdateBtn.disabled = true;
+  updateInfoDiv.classList.add('hidden');
+  updateDownloadProgress.classList.remove('hidden');
+  updateProgressBar.style.width = '0%';
+  updateProgressText.textContent = '0%';
+  
+  try {
+    // Pass the filename from updateInfo if available
+    const fileName = currentUpdateInfo.fileName || null;
+    const result = await window.electronAPI.downloadUpdate(currentUpdateInfo.downloadUrl, fileName);
+    
+    if (result.success) {
+      updateDownloadProgress.classList.add('hidden');
+      updateDownloaded.classList.remove('hidden');
+      downloadUpdateBtn.classList.add('hidden');
+      openDownloadsBtn.classList.remove('hidden');
+      showStatus(`✅ Update downloaded to: ${result.fileName}`, 'success');
+    } else {
+      showStatus(`❌ Download failed: ${result.error}`, 'error');
+      updateInfoDiv.classList.remove('hidden');
+      updateDownloadProgress.classList.add('hidden');
+      downloadUpdateBtn.disabled = false;
+    }
+  } catch (error) {
+    showStatus(`❌ Error: ${error.message}`, 'error');
+    updateInfoDiv.classList.remove('hidden');
+    updateDownloadProgress.classList.add('hidden');
+    downloadUpdateBtn.disabled = false;
+  }
+}
+
+/**
+ * Handle open downloads folder
+ */
+async function handleOpenDownloadsFolder() {
+  try {
+    await window.electronAPI.openDownloadsFolder();
+  } catch (error) {
+    showStatus(`❌ Error opening downloads folder: ${error.message}`, 'error');
+  }
+}
+
+// Update modal event listeners
+closeUpdateModalBtn.addEventListener('click', closeUpdateModal);
+cancelUpdateBtn.addEventListener('click', closeUpdateModal);
+downloadUpdateBtn.addEventListener('click', handleDownloadUpdate);
+openDownloadsBtn.addEventListener('click', handleOpenDownloadsFolder);
+
+// Close update modal when clicking outside
+updateModal.addEventListener('click', (e) => {
+  if (e.target === updateModal) {
+    closeUpdateModal();
+  }
+});
+
+// Listen for update available event
+window.electronAPI.onUpdateAvailable((updateInfo) => {
+  console.log('Update available event received:', updateInfo);
+  showUpdateModal(updateInfo);
+});
+
+// Listen for download progress
+window.electronAPI.onDownloadProgress((progress) => {
+  const percent = progress.percent || 0;
+  updateProgressBar.style.width = `${percent}%`;
+  updateProgressText.textContent = `${percent}%`;
+  
+  // Format file size
+  const transferredMB = (progress.transferred / (1024 * 1024)).toFixed(2);
+  const totalMB = (progress.total / (1024 * 1024)).toFixed(2);
+  updateProgressText.textContent = `${percent}% (${transferredMB} MB / ${totalMB} MB)`;
 });
 
