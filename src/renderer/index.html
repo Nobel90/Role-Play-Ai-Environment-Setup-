@@ -24,10 +24,15 @@
             <div id="visualMode" class="view-mode hidden">
                 <div class="scenarios-header">
                     <h2>Scenarios</h2>
-                    <button id="addScenarioBtn" class="btn btn-success">+ Add Scenario</button>
+                    <div class="header-controls">
+                        <button id="refreshGridBtn" class="btn btn-info">🔄 Refresh Grid</button>
+                        <button id="addRowBtn" class="btn btn-secondary">+ Add Row</button>
+                        <button id="addColumnBtn" class="btn btn-secondary">+ Add Column</button>
+                        <button id="addScenarioBtn" class="btn btn-success">+ Add Scenario</button>
+                    </div>
                 </div>
-                <div id="scenariosList" class="scenarios-list">
-                    <!-- Scenarios will be dynamically added here -->
+                <div id="scenariosGrid" class="scenarios-grid">
+                    <!-- Grid slots will be dynamically added here -->
                 </div>
             </div>
 

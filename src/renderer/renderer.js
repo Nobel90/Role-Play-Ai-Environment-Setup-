@@ -64,7 +64,11 @@ const viewModeBtn = document.getElementById('viewModeBtn');
 const visualMode = document.getElementById('visualMode');
 const jsonMode = document.getElementById('jsonMode');
 const scenariosList = document.getElementById('scenariosList');
+const scenariosGrid = document.getElementById('scenariosGrid');
 const addScenarioBtn = document.getElementById('addScenarioBtn');
+const addRowBtn = document.getElementById('addRowBtn');
+const addColumnBtn = document.getElementById('addColumnBtn');
+const refreshGridBtn = document.getElementById('refreshGridBtn');
 
 // Modal Elements
 const scenarioModal = document.getElementById('scenarioModal');
@@ -78,6 +82,11 @@ const saveScenarioBtn = document.getElementById('saveScenarioBtn');
 let currentViewMode = 'json'; // 'json' or 'visual'
 let currentJsonData = null;
 let editingScenarioIndex = null;
+let gridColumns = 2; // Default 2-column grid (can be increased)
+let draggedCardIndex = null;
+let draggedCardElement = null;
+let minGridRows = 0; // Minimum number of rows to display (for empty slots)
+let minGridCols = 2; // Minimum number of columns to display (for empty slots)
 
 /**
  * Show status message
@@ -127,6 +136,8 @@ function displayJson(data) {
     const formatted = formatJson(data, 4);
     jsonTextArea.value = formatted;
     
+    // Reset and refresh grid when loading new data
+    refreshGridInternal();
     
     // Update visual mode if active
     if (currentViewMode === 'visual') {
@@ -277,20 +288,79 @@ function checkMissingFields(scenarios) {
 }
 
 /**
- * Render scenarios in visual mode
+ * Calculate grid dimensions based on scenarios
+ * @param {Array} scenarios - Array of scenarios
+ * @returns {Object} Grid dimensions {maxRow, maxCol, totalSlots}
+ */
+function calculateGridDimensions(scenarios) {
+  let maxRow = -1;
+  let maxCol = -1;
+  
+  scenarios.forEach(scenario => {
+    const row = scenario.row !== undefined ? scenario.row : 0;
+    const col = scenario.column !== undefined ? scenario.column : 0;
+    if (row > maxRow) maxRow = row;
+    if (col > maxCol) maxCol = col;
+  });
+  
+  // Ensure at least 1 row and 1 column
+  maxRow = Math.max(maxRow, 0);
+  maxCol = Math.max(maxCol, 0);
+  
+  // Use the maximum of calculated columns, minimum columns, and gridColumns
+  const calculatedCols = Math.max(maxCol + 1, minGridCols);
+  const actualColumns = Math.max(calculatedCols, gridColumns);
+  
+  // Calculate total slots needed
+  const calculatedSlots = (maxRow + 1) * actualColumns;
+  const totalSlots = Math.max(scenarios.length, calculatedSlots);
+  
+  return { maxRow, maxCol, totalSlots, actualColumns };
+}
+
+/**
+ * Get scenario at grid position
+ * @param {Array} scenarios - Array of scenarios
+ * @param {number} column - Column index
+ * @param {number} row - Row index
+ * @returns {Object|null} Scenario at position or null
+ */
+function getScenarioAtPosition(scenarios, column, row) {
+  return scenarios.find(s => {
+    const sCol = s.column !== undefined ? s.column : 0;
+    const sRow = s.row !== undefined ? s.row : 0;
+    return sCol === column && sRow === row;
+  }) || null;
+}
+
+/**
+ * Find the first empty slot in the grid
+ * @param {Array} scenarios - Array of scenarios
+ * @param {number} totalRows - Total number of rows
+ * @param {number} totalCols - Total number of columns
+ * @returns {Object|null} {column, row} of first empty slot, or null if none found
+ */
+function findFirstEmptySlot(scenarios, totalRows, totalCols) {
+  for (let row = 0; row < totalRows; row++) {
+    for (let col = 0; col < totalCols; col++) {
+      if (!getScenarioAtPosition(scenarios, col, row)) {
+        return { column: col, row: row };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Render scenarios in visual mode with grid slots
  */
 function renderScenarios() {
   if (!currentJsonData) {
-    scenariosList.innerHTML = '<div class="empty-state"><h3>No data loaded</h3><p>Click "Reload JSON" to fetch scenarios</p></div>';
+    scenariosGrid.innerHTML = '<div class="empty-state"><h3>No data loaded</h3><p>Click "Reload JSON" to fetch scenarios</p></div>';
     return;
   }
   
   const scenarios = parseScenarios(currentJsonData);
-  
-  if (scenarios.length === 0) {
-    scenariosList.innerHTML = '<div class="empty-state"><h3>No scenarios found</h3><p>Click "Add Scenario" to create your first scenario</p></div>';
-    return;
-  }
   
   // Check for missing fields and prompt user
   const scenariosWithMissingFields = checkMissingFields(scenarios);
@@ -300,34 +370,82 @@ function renderScenarios() {
     showStatus(`⚠️ ${missingCount} scenario(s) have missing required fields (${fieldsList}). Please edit them to fill in the missing information.`, 'error');
   }
   
-  scenariosList.innerHTML = scenarios.map((scenario, index) => {
-    // Use normalized field names (parseScenarios already normalized them)
-    const title = scenario.title || scenario.name || 'Untitled Scenario';
-    const characterId = scenario.characterId || 'Unknown';
-    const environmentValue = scenario.environment || '';
-    const environment = getEnvironmentDisplayName(environmentValue);
-    const greeting = scenario.greeting || '';
-    const id = scenario.id || `scenario-${index}`;
-    
-    return `
-      <div class="scenario-card" data-index="${index}">
-        <div class="scenario-card-header">
-          <div>
-            <h3 class="scenario-card-title">${escapeHtml(title)}</h3>
-            <p class="scenario-card-character">Character ID: ${escapeHtml(characterId)}</p>
+  // Calculate grid dimensions
+  const { maxRow, totalSlots, actualColumns } = calculateGridDimensions(scenarios);
+  // Use minimum rows if it's greater than calculated rows
+  const calculatedRows = Math.max(maxRow + 1, Math.ceil(totalSlots / actualColumns));
+  const totalRows = Math.max(calculatedRows, minGridRows);
+  const totalCols = Math.max(actualColumns, minGridCols);
+  
+  // Update grid columns for CSS
+  scenariosGrid.style.gridTemplateColumns = `repeat(${totalCols}, 1fr)`;
+  
+  // Create grid slots
+  let gridHTML = '';
+  for (let row = 0; row < totalRows; row++) {
+    for (let col = 0; col < totalCols; col++) {
+      const scenario = getScenarioAtPosition(scenarios, col, row);
+      const slotIndex = row * totalCols + col;
+      
+      if (scenario) {
+        // Slot with scenario card
+        const scenarioIndex = scenarios.indexOf(scenario);
+        const title = scenario.title || scenario.name || 'Untitled Scenario';
+        const characterId = scenario.characterId || 'Unknown';
+        const environmentValue = scenario.environment || '';
+        const environment = getEnvironmentDisplayName(environmentValue);
+        const greeting = scenario.greeting || '';
+        
+        gridHTML += `
+          <div class="grid-slot" data-column="${col}" data-row="${row}" data-slot-index="${slotIndex}" 
+               ondragover="event.preventDefault(); handleDragOver(event)" 
+               ondrop="handleDrop(event, ${col}, ${row})" 
+               ondragenter="handleDragEnter(event)" 
+               ondragleave="handleDragLeave(event)">
+            <div class="scenario-card" draggable="true" 
+                 data-scenario-index="${scenarioIndex}"
+                 ondragstart="handleDragStart(event, ${scenarioIndex})" 
+                 ondragend="handleDragEnd(event)">
+              <div class="scenario-card-header">
+                <div>
+                  <h3 class="scenario-card-title">${escapeHtml(title)}</h3>
+                  <p class="scenario-card-character">Character ID: ${escapeHtml(characterId)}</p>
+                </div>
+                <div class="scenario-card-actions">
+                  <button class="btn btn-secondary btn-icon" onclick="editScenario(${scenarioIndex})">✏️ Edit</button>
+                  <button class="btn btn-danger btn-icon" onclick="deleteScenario(${scenarioIndex})">🗑️ Delete</button>
+                </div>
+              </div>
+              <div class="scenario-card-body">
+                <p class="scenario-card-info"><strong>Environment:</strong> ${escapeHtml(environment)}</p>
+                ${greeting ? `<p class="scenario-card-info"><strong>Greeting:</strong> ${escapeHtml(greeting)}</p>` : '<p class="scenario-card-info"><em>No greeting set</em></p>'}
+              </div>
+            </div>
           </div>
-          <div class="scenario-card-actions">
-            <button class="btn btn-secondary btn-icon" onclick="editScenario(${index})">✏️ Edit</button>
-            <button class="btn btn-danger btn-icon" onclick="deleteScenario(${index})">🗑️ Delete</button>
+        `;
+      } else {
+        // Empty slot
+        gridHTML += `
+          <div class="grid-slot grid-slot-empty" data-column="${col}" data-row="${row}" data-slot-index="${slotIndex}"
+               ondragover="event.preventDefault(); handleDragOver(event)" 
+               ondrop="handleDrop(event, ${col}, ${row})" 
+               ondragenter="handleDragEnter(event)" 
+               ondragleave="handleDragLeave(event)">
+            <div class="empty-slot-indicator">
+              <span class="empty-slot-text">Empty Slot</span>
+              <button class="btn-remove-slot" onclick="removeEmptySlot(${col}, ${row})" title="Remove empty slot">×</button>
+            </div>
           </div>
-        </div>
-        <div class="scenario-card-body">
-          <p class="scenario-card-info"><strong>Environment:</strong> ${escapeHtml(environment)}</p>
-          ${greeting ? `<p class="scenario-card-info"><strong>Greeting:</strong> ${escapeHtml(greeting)}</p>` : '<p class="scenario-card-info"><em>No greeting set</em></p>'}
-        </div>
-      </div>
-    `;
-  }).join('');
+        `;
+      }
+    }
+  }
+  
+  scenariosGrid.innerHTML = gridHTML;
+  
+  if (scenarios.length === 0 && totalSlots === 0) {
+    scenariosGrid.innerHTML = '<div class="empty-state"><h3>No scenarios found</h3><p>Click "Add Scenario" to create your first scenario</p></div>';
+  }
 }
 
 /**
@@ -524,18 +642,41 @@ function saveScenario() {
       originalScenarios[editingScenarioIndex] = updatedScenario;
     }
   } else {
-    // Add new scenario - use capitalized field names to match existing structure
-    const newIndex = originalScenarios.length;
+    // Add new scenario - find first empty slot or add new row
     const useCapitalized = originalScenarios.length > 0 && 
                           (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
     
+    // Get current grid dimensions
+    const normalizedScenarios = parseScenarios(currentJsonData);
+    const { maxRow, actualColumns } = calculateGridDimensions(normalizedScenarios);
+    const totalCols = Math.max(actualColumns, minGridCols);
+    const totalRows = Math.max(maxRow + 1, minGridRows);
+    
+    // Find first empty slot
+    let emptySlot = findFirstEmptySlot(normalizedScenarios, totalRows, totalCols);
+    let targetColumn, targetRow;
+    
+    if (emptySlot) {
+      // Use the first empty slot found
+      targetColumn = emptySlot.column;
+      targetRow = emptySlot.row;
+    } else {
+      // No empty slot found, add a new row
+      targetRow = totalRows;
+      targetColumn = 0;
+      minGridRows = totalRows + 1;
+    }
+    
+    // Calculate ButtonIndex
+    const buttonIndex = targetRow * totalCols + targetColumn;
+    
     if (useCapitalized) {
       originalScenarios.push({
-        Column: newIndex % 2,
-        Row: Math.floor(newIndex / 2),
+        Column: targetColumn,
+        Row: targetRow,
         Title: title,
         CharacterID: characterId,
-        ButtonIndex: newIndex,
+        ButtonIndex: buttonIndex,
         Environment: environment,
         Greeting: greeting
       });
@@ -546,9 +687,9 @@ function saveScenario() {
         characterId,
         environment,
         greeting,
-        column: newIndex % 2,
-        row: Math.floor(newIndex / 2),
-        buttonIndex: newIndex
+        column: targetColumn,
+        row: targetRow,
+        buttonIndex: buttonIndex
       });
     }
   }
@@ -574,18 +715,90 @@ function editScenario(index) {
 
 /**
  * Delete scenario
- * @param {number} index - Index of scenario to delete
+ * @param {number} index - Index of scenario to delete (normalized index)
  */
 function deleteScenario(index) {
   if (!confirm('Are you sure you want to delete this scenario?')) {
     return;
   }
   
-  const scenarios = parseScenarios(currentJsonData);
-  scenarios.splice(index, 1);
+  // Get original scenarios to preserve structure
+  let originalScenarios = [];
+  let isArrayStructure = false;
+  
+  if (Array.isArray(currentJsonData)) {
+    originalScenarios = deepClone(currentJsonData);
+    isArrayStructure = true;
+  } else if (currentJsonData && currentJsonData.scenarios) {
+    originalScenarios = deepClone(currentJsonData.scenarios);
+  }
+  
+  // Get normalized scenarios to find the correct original scenario
+  const normalizedScenarios = parseScenarios(currentJsonData);
+  const scenarioToDelete = normalizedScenarios[index];
+  
+  if (!scenarioToDelete) {
+    showStatus('❌ Error: Scenario not found', 'error');
+    return;
+  }
+  
+  // Find the original scenario by matching key fields
+  const useCapitalized = originalScenarios.length > 0 && 
+                        (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
+  
+  let originalIndex = -1;
+  if (useCapitalized) {
+    originalIndex = originalScenarios.findIndex(s => {
+      const sTitle = s.Title || '';
+      const sCharId = s.CharacterID || '';
+      return sTitle === scenarioToDelete.title && sCharId === scenarioToDelete.characterId;
+    });
+  } else {
+    originalIndex = originalScenarios.findIndex(s => {
+      const sTitle = s.title || s.name || '';
+      const sCharId = s.characterId || s.characterID || s.character_id || s.character || '';
+      return sTitle === scenarioToDelete.title && sCharId === scenarioToDelete.characterId;
+    });
+  }
+  
+  if (originalIndex === -1) {
+    // Fallback: use index directly if matching fails
+    originalIndex = index;
+  }
+  
+  // Remove the scenario
+  originalScenarios.splice(originalIndex, 1);
+  
+  // Clean up normalized fields from all remaining scenarios
+  originalScenarios = originalScenarios.map(s => {
+    const sUseCapitalized = s.Title !== undefined || s.CharacterID !== undefined;
+    if (sUseCapitalized) {
+      const clean = {};
+      if (s.Column !== undefined) clean.Column = s.Column;
+      if (s.Row !== undefined) clean.Row = s.Row;
+      if (s.Title !== undefined) clean.Title = s.Title;
+      if (s.CharacterID !== undefined) clean.CharacterID = s.CharacterID;
+      if (s.ButtonIndex !== undefined) clean.ButtonIndex = s.ButtonIndex;
+      if (s.Environment !== undefined) clean.Environment = s.Environment;
+      if (s.Greeting !== undefined) clean.Greeting = s.Greeting;
+      return clean;
+    } else {
+      // For lowercase, keep original structure but remove any normalized duplicates
+      const clean = { ...s };
+      // Remove normalized fields if they exist as duplicates
+      if (clean.title && clean.Title) delete clean.title;
+      if (clean.characterId && clean.CharacterID) delete clean.characterId;
+      if (clean.environment && clean.Environment) delete clean.environment;
+      if (clean.greeting && clean.Greeting) delete clean.greeting;
+      if (clean.column !== undefined && clean.Column !== undefined) delete clean.column;
+      if (clean.row !== undefined && clean.Row !== undefined) delete clean.row;
+      if (clean.buttonIndex !== undefined && clean.ButtonIndex !== undefined) delete clean.buttonIndex;
+      return clean;
+    }
+  });
   
   // Rebuild JSON structure
-  const newJsonData = buildJsonStructure(scenarios);
+  const newJsonData = isArrayStructure ? originalScenarios : { scenarios: originalScenarios };
   currentJsonData = newJsonData;
   
   // Update JSON textarea
@@ -594,9 +807,388 @@ function deleteScenario(index) {
   showStatus('✅ Scenario deleted');
 }
 
+/**
+ * Handle drag start
+ */
+function handleDragStart(event, scenarioIndex) {
+  draggedCardIndex = scenarioIndex;
+  draggedCardElement = event.target.closest('.scenario-card');
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/html', event.target.outerHTML);
+  draggedCardElement.classList.add('dragging');
+}
+
+/**
+ * Handle drag end
+ */
+function handleDragEnd(event) {
+  event.target.closest('.scenario-card')?.classList.remove('dragging');
+  // Remove drag-over class from all slots
+  document.querySelectorAll('.grid-slot').forEach(slot => {
+    slot.classList.remove('drag-over');
+  });
+  draggedCardIndex = null;
+  draggedCardElement = null;
+}
+
+/**
+ * Handle drag over
+ */
+function handleDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+}
+
+/**
+ * Handle drag enter
+ */
+function handleDragEnter(event) {
+  if (event.target.classList.contains('grid-slot')) {
+    event.target.classList.add('drag-over');
+  }
+}
+
+/**
+ * Handle drag leave
+ */
+function handleDragLeave(event) {
+  if (event.target.classList.contains('grid-slot')) {
+    event.target.classList.remove('drag-over');
+  }
+}
+
+/**
+ * Handle drop
+ */
+function handleDrop(event, targetColumn, targetRow) {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  if (draggedCardIndex === null) return;
+  
+  const scenarios = parseScenarios(currentJsonData);
+  const scenario = scenarios[draggedCardIndex];
+  
+  if (!scenario) return;
+  
+  // Get original scenarios to preserve structure
+  let originalScenarios = [];
+  let isArrayStructure = false;
+  
+  if (Array.isArray(currentJsonData)) {
+    originalScenarios = deepClone(currentJsonData);
+    isArrayStructure = true;
+  } else if (currentJsonData && currentJsonData.scenarios) {
+    originalScenarios = deepClone(currentJsonData.scenarios);
+  }
+  
+  // Find the original scenario by index (before cleaning)
+  const originalScenario = originalScenarios[draggedCardIndex];
+  
+  if (!originalScenario) return;
+  
+  // Determine field name style
+  const useCapitalized = originalScenario.Title !== undefined || originalScenario.CharacterID !== undefined;
+  
+  // Get current grid dimensions
+  const { actualColumns } = calculateGridDimensions(parseScenarios(currentJsonData));
+  const totalCols = Math.max(actualColumns, minGridCols);
+  
+  // Check if target slot has a scenario (swap scenario positions)
+  const targetScenario = originalScenarios.find(s => {
+    const sCol = useCapitalized ? (s.Column !== undefined ? s.Column : 0) : (s.column !== undefined ? s.column : 0);
+    const sRow = useCapitalized ? (s.Row !== undefined ? s.Row : 0) : (s.row !== undefined ? s.row : 0);
+    return sCol === targetColumn && sRow === targetRow;
+  });
+  
+  // Get original position
+  const originalCol = useCapitalized ? (originalScenario.Column !== undefined ? originalScenario.Column : 0) : (originalScenario.column !== undefined ? originalScenario.column : 0);
+  const originalRow = useCapitalized ? (originalScenario.Row !== undefined ? originalScenario.Row : 0) : (originalScenario.row !== undefined ? originalScenario.row : 0);
+  
+  // Update dragged scenario position
+  const targetSlotIndex = targetRow * totalCols + targetColumn;
+  
+  if (useCapitalized) {
+    originalScenario.Column = targetColumn;
+    originalScenario.Row = targetRow;
+    originalScenario.ButtonIndex = targetSlotIndex;
+    
+    // If swapping, update the other scenario's position
+    if (targetScenario && targetScenario !== originalScenario) {
+      targetScenario.Column = originalCol;
+      targetScenario.Row = originalRow;
+      targetScenario.ButtonIndex = originalRow * totalCols + originalCol;
+    }
+  } else {
+    originalScenario.column = targetColumn;
+    originalScenario.row = targetRow;
+    originalScenario.buttonIndex = targetSlotIndex;
+    
+    // If swapping, update the other scenario's position
+    if (targetScenario && targetScenario !== originalScenario) {
+      targetScenario.column = originalCol;
+      targetScenario.row = originalRow;
+      targetScenario.buttonIndex = originalRow * totalCols + originalCol;
+    }
+  }
+  
+  // Clean up normalized fields from all scenarios
+  originalScenarios = originalScenarios.map(s => {
+    const sUseCapitalized = s.Title !== undefined || s.CharacterID !== undefined;
+    if (sUseCapitalized) {
+      const clean = {};
+      if (s.Column !== undefined) clean.Column = s.Column;
+      if (s.Row !== undefined) clean.Row = s.Row;
+      if (s.Title !== undefined) clean.Title = s.Title;
+      if (s.CharacterID !== undefined) clean.CharacterID = s.CharacterID;
+      if (s.ButtonIndex !== undefined) clean.ButtonIndex = s.ButtonIndex;
+      if (s.Environment !== undefined) clean.Environment = s.Environment;
+      if (s.Greeting !== undefined) clean.Greeting = s.Greeting;
+      return clean;
+    }
+    return s;
+  });
+  
+  // Rebuild JSON structure
+  const newJsonData = isArrayStructure ? originalScenarios : { scenarios: originalScenarios };
+  currentJsonData = newJsonData;
+  
+  // Re-render
+  renderScenarios();
+  displayJson(newJsonData);
+  
+  showStatus('✅ Scenario moved successfully');
+}
+
+/**
+ * Check if a row has any scenarios
+ * @param {Array} scenarios - Array of scenarios
+ * @param {number} row - Row index to check
+ * @param {number} maxCol - Maximum column index
+ * @returns {boolean} True if row has scenarios
+ */
+function rowHasScenarios(scenarios, row, maxCol) {
+  for (let col = 0; col <= maxCol; col++) {
+    if (getScenarioAtPosition(scenarios, col, row)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if a column has any scenarios
+ * @param {Array} scenarios - Array of scenarios
+ * @param {number} column - Column index to check
+ * @param {number} maxRow - Maximum row index
+ * @returns {boolean} True if column has scenarios
+ */
+function columnHasScenarios(scenarios, column, maxRow) {
+  for (let row = 0; row <= maxRow; row++) {
+    if (getScenarioAtPosition(scenarios, column, row)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Add a new row of empty slots
+ */
+function addRow() {
+  if (!currentJsonData) {
+    showStatus('⚠️ Please load JSON data first', 'error');
+    return;
+  }
+  
+  const scenarios = parseScenarios(currentJsonData);
+  const { maxRow, maxCol, actualColumns } = calculateGridDimensions(scenarios);
+  
+  // If no scenarios exist, allow adding the first row
+  if (scenarios.length === 0) {
+    minGridRows = 1;
+    renderScenarios();
+    showStatus('✅ New row added');
+    return;
+  }
+  
+  // Check if the previous row (last row) has scenarios
+  const lastRow = Math.max(maxRow, minGridRows - 1);
+  if (lastRow >= 0 && !rowHasScenarios(scenarios, lastRow, maxCol)) {
+    showStatus('⚠️ Cannot add a new row. The previous row must have at least one scenario.', 'error');
+    return;
+  }
+  
+  // Increment minimum rows to add a new row of empty slots
+  const currentRows = Math.max(maxRow + 1, minGridRows);
+  minGridRows = currentRows + 1;
+  
+  // Re-render to show the new empty slots
+  renderScenarios();
+  showStatus('✅ New row added');
+}
+
+/**
+ * Add a new column of empty slots
+ */
+function addColumn() {
+  if (!currentJsonData) {
+    showStatus('⚠️ Please load JSON data first', 'error');
+    return;
+  }
+  
+  const scenarios = parseScenarios(currentJsonData);
+  const { maxRow, maxCol, actualColumns } = calculateGridDimensions(scenarios);
+  
+  // If no scenarios exist, allow adding the first column (beyond default 2)
+  if (scenarios.length === 0 && minGridCols <= 2) {
+    minGridCols = 3;
+    gridColumns = 3;
+    renderScenarios();
+    showStatus('✅ New column added');
+    return;
+  }
+  
+  // Check if the previous column (last column) has scenarios
+  const lastCol = Math.max(maxCol, minGridCols - 1);
+  if (lastCol >= 0 && !columnHasScenarios(scenarios, lastCol, maxRow)) {
+    showStatus('⚠️ Cannot add a new column. The previous column must have at least one scenario.', 'error');
+    return;
+  }
+  
+  // Increment minimum columns to add a new column of empty slots
+  const currentCols = Math.max(maxCol + 1, minGridCols);
+  minGridCols = currentCols + 1;
+  gridColumns = Math.max(gridColumns, minGridCols);
+  
+  // Re-render to show the new empty slots
+  renderScenarios();
+  showStatus('✅ New column added');
+}
+
+/**
+ * Remove empty slot
+ */
+function removeEmptySlot(column, row) {
+  const scenarios = parseScenarios(currentJsonData);
+  const scenarioAtPosition = getScenarioAtPosition(scenarios, column, row);
+  
+  if (scenarioAtPosition) {
+    showStatus('⚠️ Cannot remove slot with a scenario. Delete the scenario first.', 'error');
+    return;
+  }
+  
+  // Check if this is the last row and we can reduce minGridRows
+  const { maxRow, actualColumns } = calculateGridDimensions(scenarios);
+  const totalCols = Math.max(actualColumns, minGridCols);
+  const currentRows = Math.max(maxRow + 1, minGridRows);
+  
+  // If removing from the last row and it's empty, reduce minGridRows
+  if (row === currentRows - 1) {
+    // Check if the entire last row is empty
+    let lastRowEmpty = true;
+    for (let col = 0; col < totalCols; col++) {
+      if (getScenarioAtPosition(scenarios, col, row)) {
+        lastRowEmpty = false;
+        break;
+      }
+    }
+    
+    if (lastRowEmpty && minGridRows > 0) {
+      minGridRows = Math.max(0, minGridRows - 1);
+    }
+  }
+  
+  // Check if this is the last column and we can reduce minGridCols
+  if (column === totalCols - 1) {
+    // Check if the entire last column is empty
+    let lastColEmpty = true;
+    for (let r = 0; r < currentRows; r++) {
+      if (getScenarioAtPosition(scenarios, column, r)) {
+        lastColEmpty = false;
+        break;
+      }
+    }
+    
+    if (lastColEmpty && minGridCols > 2) {
+      minGridCols = Math.max(2, minGridCols - 1);
+      gridColumns = Math.max(2, gridColumns);
+    }
+  }
+  
+  // Re-render
+  renderScenarios();
+  showStatus('✅ Empty slot removed');
+}
+
+/**
+ * Internal function to refresh grid (called automatically on data load)
+ */
+function refreshGridInternal() {
+  if (!currentJsonData) {
+    minGridRows = 0;
+    minGridCols = 2;
+    gridColumns = 2;
+    return;
+  }
+  
+  const scenarios = parseScenarios(currentJsonData);
+  
+  if (scenarios.length === 0) {
+    // No scenarios, reset to default
+    minGridRows = 0;
+    minGridCols = 2;
+    gridColumns = 2;
+    return;
+  }
+  
+  // Find the actual maximum row and column that have scenarios
+  let maxRowWithData = -1;
+  let maxColWithData = -1;
+  
+  scenarios.forEach(scenario => {
+    const row = scenario.row !== undefined ? scenario.row : 0;
+    const col = scenario.column !== undefined ? scenario.column : 0;
+    if (row > maxRowWithData) maxRowWithData = row;
+    if (col > maxColWithData) maxColWithData = col;
+  });
+  
+  // Reset minGridRows and minGridCols to match actual data
+  // Add 1 because rows/columns are 0-indexed
+  minGridRows = maxRowWithData + 1;
+  minGridCols = Math.max(maxColWithData + 1, 2); // Minimum 2 columns
+  gridColumns = minGridCols;
+}
+
+/**
+ * Refresh grid - remove empty rows and columns, reset to match actual data
+ */
+function refreshGrid() {
+  if (!currentJsonData) {
+    showStatus('⚠️ Please load JSON data first', 'error');
+    return;
+  }
+  
+  refreshGridInternal();
+  
+  // Re-render
+  renderScenarios();
+  showStatus('✅ Grid refreshed - empty rows and columns removed');
+}
+
 // Make functions globally available for onclick handlers
 window.editScenario = editScenario;
 window.deleteScenario = deleteScenario;
+window.handleDragStart = handleDragStart;
+window.handleDragEnd = handleDragEnd;
+window.handleDragOver = handleDragOver;
+window.handleDragEnter = handleDragEnter;
+window.handleDragLeave = handleDragLeave;
+window.handleDrop = handleDrop;
+window.addRow = addRow;
+window.addColumn = addColumn;
+window.removeEmptySlot = removeEmptySlot;
+window.refreshGrid = refreshGrid;
 
 /**
  * Handle fetch JSON from API
@@ -743,6 +1335,9 @@ loadFileBtn.addEventListener('click', handleLoadFromFile);
 saveFileBtn.addEventListener('click', handleSaveToFile);
 viewModeBtn.addEventListener('click', toggleViewMode);
 addScenarioBtn.addEventListener('click', () => openScenarioModal(null));
+addRowBtn.addEventListener('click', addRow);
+addColumnBtn.addEventListener('click', addColumn);
+refreshGridBtn.addEventListener('click', refreshGrid);
 closeModalBtn.addEventListener('click', closeScenarioModal);
 cancelScenarioBtn.addEventListener('click', closeScenarioModal);
 scenarioForm.addEventListener('submit', (e) => {

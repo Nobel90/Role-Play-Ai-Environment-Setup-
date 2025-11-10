@@ -4,35 +4,53 @@ directories:
   output: dist
   buildResources: build
 
+# Optimize file inclusion - exclude unnecessary files
 files:
   - src/**/*
   - package.json
-  - package-lock.json
+  # Exclude test files, docs, and dev files
+  - "!**/*.test.js"
+  - "!**/tests/**"
+  - "!**/docs/**"
+  - "!**/memory-bank/**"
+  - "!**/node_modules/**"
+  - "!**/.git/**"
+  - "!**/README.md"
+  - "!**/jest.config.js"
+  - "!**/electron-builder.yml"
+
+# Compression for smaller size
+compression: maximum
+
+# GitHub releases for auto-update
+publish:
+  provider: github
+  owner: Nobel90
+  repo: Role-Play-Ai-Environment-Setup-
 
 win:
   target:
-    - target: nsis
+    - target: portable
       arch:
         - x64
-  icon: assets/icons/icon.ico
+  artifactName: ${productName}-${version}-portable.${ext}
 
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+
+# NSIS installer (optional, for users who want installer)
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: VRC Character Updater
-  installerIcon: assets/icons/icon.ico
-  uninstallerIcon: assets/icons/icon.ico
-  installerHeaderIcon: assets/icons/icon.ico
 
 mac:
   target: dmg
-  icon: assets/icons/icon.icns
   category: public.app-category.utilities
 
 linux:
   target: AppImage
-  icon: assets/icons/icon.png
   category: Utility
 
