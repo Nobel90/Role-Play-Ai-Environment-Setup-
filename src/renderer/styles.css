@@ -9,6 +9,11 @@
     box-sizing: border-box;
 }
 
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+
 :root {
     /* ClickUp-inspired dark color palette */
     --bg-primary: #1e1e2e;
@@ -564,6 +569,13 @@ body {
     animation: modalSlideIn 0.3s ease;
 }
 
+/* Larger update modal */
+#updateModal .modal-content {
+    max-width: 700px;
+    width: 90%;
+    max-height: 85vh;
+}
+
 @keyframes modalSlideIn {
     from {
         transform: scale(0.95);
@@ -590,6 +602,15 @@ body {
     margin: 0;
 }
 
+/* Update modal header */
+#updateModal .modal-header {
+    padding: var(--spacing-md) var(--spacing-lg);
+}
+
+#updateModal .modal-header h3 {
+    font-size: 16px;
+}
+
 .btn-close {
     background: none;
     border: none;
@@ -607,6 +628,13 @@ body {
     line-height: 1;
 }
 
+/* Smaller close button for update modal */
+#updateModal .btn-close {
+    font-size: 24px;
+    width: 28px;
+    height: 28px;
+}
+
 .btn-close:hover {
     background-color: var(--bg-hover);
     color: var(--text-primary);
@@ -615,6 +643,23 @@ body {
 .modal-body {
     padding: var(--spacing-lg);
     overflow-y: auto;
+}
+
+/* Update modal body */
+#updateModal .modal-body {
+    padding: var(--spacing-lg);
+}
+
+/* Buttons in update modal */
+#updateModal .form-actions {
+    margin-top: 1.25rem;
+    padding-top: var(--spacing-md);
+    gap: var(--spacing-sm);
+}
+
+#updateModal .form-actions .btn {
+    padding: 7px 12px;
+    font-size: 12px;
 }
 
 /* Form Elements */
@@ -691,6 +736,163 @@ body {
     font-size: 12px;
     color: var(--text-secondary);
     line-height: 1.5;
+}
+
+/* GitHub-style Markdown Styling */
+#updateReleaseNotes {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica', 'Arial', sans-serif;
+    line-height: 1.5;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+}
+
+/* Headers */
+#updateReleaseNotes .markdown-h3 {
+    font-size: 1.4em;
+    font-weight: 600;
+    margin-top: 1.25em;
+    margin-bottom: 0.5em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+#updateReleaseNotes .markdown-h4 {
+    font-size: 1.2em;
+    font-weight: 600;
+    margin-top: 1em;
+    margin-bottom: 0.4em;
+    color: var(--text-primary);
+}
+
+#updateReleaseNotes .markdown-h5 {
+    font-size: 1.05em;
+    font-weight: 600;
+    margin-top: 0.875em;
+    margin-bottom: 0.4em;
+    color: var(--text-primary);
+}
+
+#updateReleaseNotes .markdown-h6 {
+    font-size: 0.95em;
+    font-weight: 600;
+    margin-top: 0.75em;
+    margin-bottom: 0.4em;
+    color: var(--text-secondary);
+}
+
+/* Paragraphs */
+#updateReleaseNotes .markdown-paragraph {
+    margin: 0.6em 0;
+    line-height: 1.5;
+}
+
+/* Lists */
+#updateReleaseNotes .markdown-list {
+    margin: 0.6em 0;
+    padding-left: 1.75em;
+    list-style-type: disc;
+}
+
+#updateReleaseNotes .markdown-list ol {
+    list-style-type: decimal;
+    margin-top: 0.5em;
+}
+
+#updateReleaseNotes .markdown-list-item {
+    margin: 0.25em 0;
+    line-height: 1.6;
+}
+
+#updateReleaseNotes .markdown-list .markdown-list {
+    margin-top: 0.25em;
+    margin-bottom: 0.25em;
+}
+
+/* Code blocks */
+#updateReleaseNotes .markdown-code-block {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.875em;
+    margin: 0.875em 0;
+    overflow-x: auto;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.8em;
+    line-height: 1.4;
+}
+
+#updateReleaseNotes .markdown-code-block code {
+    background: transparent;
+    padding: 0;
+    border: none;
+    color: var(--text-primary);
+}
+
+/* Inline code */
+#updateReleaseNotes .markdown-inline-code {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 0.15em 0.35em;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.85em;
+    color: var(--primary-color);
+}
+
+/* Links */
+#updateReleaseNotes .markdown-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+}
+
+#updateReleaseNotes .markdown-link:hover {
+    border-bottom-color: var(--primary-color);
+    text-decoration: none;
+}
+
+/* Bold and Italic */
+#updateReleaseNotes .markdown-bold {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+#updateReleaseNotes .markdown-italic {
+    font-style: italic;
+}
+
+/* Strikethrough */
+#updateReleaseNotes .markdown-strikethrough {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+/* Blockquotes */
+#updateReleaseNotes .markdown-blockquote {
+    margin: 1em 0;
+    padding: 0 1em;
+    border-left: 4px solid var(--border-color);
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Horizontal rules */
+#updateReleaseNotes .markdown-hr {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 1.5em 0;
+}
+
+/* Nested content in lists */
+#updateReleaseNotes .markdown-list-item .markdown-paragraph {
+    margin: 0.25em 0;
+}
+
+#updateReleaseNotes .markdown-list-item .markdown-list {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
 }
 
 /* Empty State */

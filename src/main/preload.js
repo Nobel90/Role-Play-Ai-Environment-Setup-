@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   downloadUpdate: (downloadUrl, fileName) => ipcRenderer.invoke('download-update', downloadUrl, fileName),
   openDownloadsFolder: () => ipcRenderer.invoke('open-downloads-folder'),
+  installAndRestart: (newExePath) => ipcRenderer.invoke('install-and-restart', newExePath),
   
   // Update event listeners
   onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (event, info) => callback(info)),

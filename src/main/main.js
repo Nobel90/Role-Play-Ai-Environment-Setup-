@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const { fetchJson, uploadJson } = require('../api/jsonbin-client');
 const { readJsonFile, writeJsonFile, validateJson } = require('../utils/file-handler');
-const { checkForUpdates, downloadUpdate } = require('../utils/portable-updater');
+const { checkForUpdates, downloadUpdate, installAndRestart } = require('../utils/portable-updater');
 
 let mainWindow;
 
@@ -170,6 +170,28 @@ ipcMain.handle('open-downloads-folder', () => {
   const downloadsPath = app.getPath('downloads');
   shell.openPath(downloadsPath);
   return { success: true, path: downloadsPath };
+});
+
+// IPC handler for install and restart
+ipcMain.handle('install-and-restart', async (event, newExePath) => {
+  if (!app.isPackaged) {
+    return { success: false, error: 'Install and restart is only available in production builds' };
+  }
+  
+  try {
+    const oldExePath = process.execPath;
+    const result = installAndRestart(newExePath, oldExePath);
+    
+    // Quit the app after a short delay to allow the helper script to start
+    setTimeout(() => {
+      app.quit();
+    }, 500);
+    
+    return { success: true, ...result };
+  } catch (error) {
+    console.error('Install and restart error:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // App event handlers

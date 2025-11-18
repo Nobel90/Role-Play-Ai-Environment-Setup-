@@ -1599,8 +1599,216 @@ const updateProgressBar = document.getElementById('updateProgressBar');
 const updateProgressText = document.getElementById('updateProgressText');
 const updateDownloaded = document.getElementById('updateDownloaded');
 const updateInfoDiv = document.getElementById('updateInfo');
+const updateStatusMessage = document.getElementById('updateStatusMessage');
+const updateDownloadStatus = document.getElementById('updateDownloadStatus');
+const installRestartBtn = document.getElementById('installRestartBtn');
 
 let currentUpdateInfo = null;
+
+/**
+ * Convert GitHub-style markdown to HTML
+ */
+function markdownToHtml(markdown) {
+  if (!markdown) return '';
+  
+  // Store code blocks temporarily to avoid processing them as markdown
+  const codeBlockPlaceholders = [];
+  let placeholderIndex = 0;
+  
+  // Replace code blocks with placeholders first
+  let html = markdown.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+    const placeholder = `__CODE_BLOCK_${placeholderIndex}__`;
+    codeBlockPlaceholders[placeholderIndex] = {
+      lang: lang || 'text',
+      code: code.trim()
+    };
+    placeholderIndex++;
+    return placeholder;
+  });
+  
+  // Process line by line
+  const lines = html.split('\n');
+  let inList = false;
+  let inOrderedList = false;
+  let result = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    const trimmed = line.trim();
+    
+    // Check if this is a code block placeholder
+    const codeBlockMatch = line.match(/__CODE_BLOCK_(\d+)__/);
+    if (codeBlockMatch) {
+      // Close any open lists
+      if (inList) {
+        result.push('</ul>');
+        inList = false;
+      }
+      if (inOrderedList) {
+        result.push('</ol>');
+        inOrderedList = false;
+      }
+      
+      const index = parseInt(codeBlockMatch[1]);
+      const codeBlock = codeBlockPlaceholders[index];
+      const escaped = escapeHtml(codeBlock.code);
+      result.push(`<pre class="markdown-code-block"><code class="language-${codeBlock.lang}">${escaped}</code></pre>`);
+      continue;
+    }
+    
+    // Headers
+    if (trimmed.startsWith('#### ')) {
+      if (inList) { result.push('</ul>'); inList = false; }
+      if (inOrderedList) { result.push('</ol>'); inOrderedList = false; }
+      result.push(`<h6 class="markdown-h6">${processInlineMarkdown(trimmed.substring(5))}</h6>`);
+      continue;
+    }
+    if (trimmed.startsWith('### ')) {
+      if (inList) { result.push('</ul>'); inList = false; }
+      if (inOrderedList) { result.push('</ol>'); inOrderedList = false; }
+      result.push(`<h5 class="markdown-h5">${processInlineMarkdown(trimmed.substring(4))}</h5>`);
+      continue;
+    }
+    if (trimmed.startsWith('## ')) {
+      if (inList) { result.push('</ul>'); inList = false; }
+      if (inOrderedList) { result.push('</ol>'); inOrderedList = false; }
+      result.push(`<h4 class="markdown-h4">${processInlineMarkdown(trimmed.substring(3))}</h4>`);
+      continue;
+    }
+    if (trimmed.startsWith('# ')) {
+      if (inList) { result.push('</ul>'); inList = false; }
+      if (inOrderedList) { result.push('</ol>'); inOrderedList = false; }
+      result.push(`<h3 class="markdown-h3">${processInlineMarkdown(trimmed.substring(2))}</h3>`);
+      continue;
+    }
+    
+    // Horizontal rules
+    if (trimmed === '---' || trimmed === '***') {
+      if (inList) { result.push('</ul>'); inList = false; }
+      if (inOrderedList) { result.push('</ol>'); inOrderedList = false; }
+      result.push('<hr class="markdown-hr">');
+      continue;
+    }
+    
+    // Blockquotes
+    if (trimmed.startsWith('> ')) {
+      if (inList) { result.push('</ul>'); inList = false; }
+      if (inOrderedList) { result.push('</ol>'); inOrderedList = false; }
+      result.push(`<blockquote class="markdown-blockquote">${processInlineMarkdown(trimmed.substring(2))}</blockquote>`);
+      continue;
+    }
+    
+    // Unordered list item
+    if (/^[-*+] (.+)$/.test(trimmed)) {
+      if (!inList) {
+        if (inOrderedList) {
+          result.push('</ol>');
+          inOrderedList = false;
+        }
+        result.push('<ul class="markdown-list">');
+        inList = true;
+      }
+      const content = trimmed.replace(/^[-*+] /, '');
+      result.push(`<li class="markdown-list-item">${processInlineMarkdown(content)}</li>`);
+      continue;
+    }
+    
+    // Ordered list item
+    if (/^\d+\. (.+)$/.test(trimmed)) {
+      if (!inOrderedList) {
+        if (inList) {
+          result.push('</ul>');
+          inList = false;
+        }
+        result.push('<ol class="markdown-list">');
+        inOrderedList = true;
+      }
+      const content = trimmed.replace(/^\d+\. /, '');
+      result.push(`<li class="markdown-list-item">${processInlineMarkdown(content)}</li>`);
+      continue;
+    }
+    
+    // Empty line - close lists
+    if (!trimmed) {
+      if (inList) {
+        result.push('</ul>');
+        inList = false;
+      }
+      if (inOrderedList) {
+        result.push('</ol>');
+        inOrderedList = false;
+      }
+      result.push('');
+      continue;
+    }
+    
+    // Regular line
+    if (inList) {
+      result.push('</ul>');
+      inList = false;
+    }
+    if (inOrderedList) {
+      result.push('</ol>');
+      inOrderedList = false;
+    }
+    
+    result.push(`<p class="markdown-paragraph">${processInlineMarkdown(trimmed)}</p>`);
+  }
+  
+  // Close any open lists
+  if (inList) result.push('</ul>');
+  if (inOrderedList) result.push('</ol>');
+  
+  html = result.join('\n');
+  
+  // Clean up empty paragraphs and excessive newlines
+  html = html.replace(/<p class="markdown-paragraph"><\/p>/g, '');
+  html = html.replace(/\n{3,}/g, '\n\n');
+  
+  return html.trim();
+}
+
+/**
+ * Process inline markdown (bold, italic, links, code) in already processed text
+ */
+function processInlineMarkdown(text) {
+  // Escape HTML first
+  let html = escapeHtml(text);
+  
+  // Process in order: code, links, bold, italic, strikethrough
+  
+  // Inline code - protect from other processing
+  const codePlaceholders = [];
+  let codeIndex = 0;
+  html = html.replace(/`([^`]+)`/g, (match, code) => {
+    const placeholder = `__INLINE_CODE_${codeIndex}__`;
+    codePlaceholders[codeIndex] = code;
+    codeIndex++;
+    return placeholder;
+  });
+  
+  // Links
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="markdown-link" target="_blank" rel="noopener noreferrer">$1</a>');
+  
+  // Bold (**text** or __text__) - process before italic
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="markdown-bold">$1</strong>');
+  html = html.replace(/__([^_]+)__/g, '<strong class="markdown-bold">$1</strong>');
+  
+  // Italic (*text* or _text_) - only single asterisks/underscores not part of bold
+  // Use a pattern that avoids matching when surrounded by same character
+  html = html.replace(/(^|[^*])\*([^*]+)\*([^*]|$)/g, '$1<em class="markdown-italic">$2</em>$3');
+  html = html.replace(/(^|[^_])_([^_]+)_([^_]|$)/g, '$1<em class="markdown-italic">$2</em>$3');
+  
+  // Strikethrough
+  html = html.replace(/~~([^~]+)~~/g, '<del class="markdown-strikethrough">$1</del>');
+  
+  // Restore inline code
+  for (let i = 0; i < codePlaceholders.length; i++) {
+    html = html.replace(`__INLINE_CODE_${i}__`, `<code class="markdown-inline-code">${codePlaceholders[i]}</code>`);
+  }
+  
+  return html;
+}
 
 /**
  * Show update modal
@@ -1610,43 +1818,33 @@ function showUpdateModal(updateInfo) {
   currentVersionSpan.textContent = updateInfo.currentVersion;
   latestVersionSpan.textContent = updateInfo.latestVersion;
   
-  // Format release notes (convert markdown-like text to HTML)
+  // Set initial status message
+  if (updateStatusMessage) {
+    updateStatusMessage.textContent = 'Update available for download';
+  }
+  
+  // Format release notes with GitHub-style markdown
   if (updateInfo.releaseNotes) {
-    const notes = updateInfo.releaseNotes
-      .split('\n')
-      .map(line => {
-        // Convert markdown headers
-        if (line.startsWith('## ')) {
-          return `<h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">${line.substring(3)}</h4>`;
-        }
-        if (line.startsWith('### ')) {
-          return `<h5 style="margin-top: 0.75rem; margin-bottom: 0.25rem;">${line.substring(4)}</h5>`;
-        }
-        // Convert bullet points
-        if (line.trim().startsWith('- ')) {
-          return `<li>${line.substring(2)}</li>`;
-        }
-        // Regular paragraph
-        if (line.trim()) {
-          return `<p style="margin: 0.25rem 0;">${line}</p>`;
-        }
-        return '';
-      })
-      .filter(line => line)
-      .join('');
-    
-    updateReleaseNotes.innerHTML = notes || '<p>No release notes available.</p>';
+    const formattedNotes = markdownToHtml(updateInfo.releaseNotes);
+    updateReleaseNotes.innerHTML = formattedNotes || '<p class="markdown-paragraph">No release notes available.</p>';
   } else {
-    updateReleaseNotes.innerHTML = '<p>No release notes available.</p>';
+    updateReleaseNotes.innerHTML = '<p class="markdown-paragraph">No release notes available.</p>';
   }
   
   // Reset UI state
   updateDownloadProgress.classList.add('hidden');
   updateDownloaded.classList.add('hidden');
   openDownloadsBtn.classList.add('hidden');
+  installRestartBtn.classList.add('hidden');
   downloadUpdateBtn.classList.remove('hidden');
   downloadUpdateBtn.disabled = false;
   updateInfoDiv.classList.remove('hidden');
+  
+  // Reset download status message
+  if (updateDownloadStatus) {
+    updateDownloadStatus.textContent = 'Downloading update...';
+    updateDownloadStatus.style.color = '';
+  }
   
   updateModal.classList.remove('hidden');
 }
@@ -1671,8 +1869,15 @@ async function handleDownloadUpdate() {
   downloadUpdateBtn.disabled = true;
   updateInfoDiv.classList.add('hidden');
   updateDownloadProgress.classList.remove('hidden');
+  updateDownloaded.classList.add('hidden'); // Ensure downloaded section is hidden
   updateProgressBar.style.width = '0%';
   updateProgressText.textContent = '0%';
+  
+  // Reset download status message
+  if (updateDownloadStatus) {
+    updateDownloadStatus.textContent = 'Downloading update...';
+    updateDownloadStatus.style.color = '';
+  }
   
   try {
     // Pass the filename from updateInfo if available
@@ -1680,10 +1885,24 @@ async function handleDownloadUpdate() {
     const result = await window.electronAPI.downloadUpdate(currentUpdateInfo.downloadUrl, fileName);
     
     if (result.success) {
-      updateDownloadProgress.classList.add('hidden');
-      updateDownloaded.classList.remove('hidden');
-      downloadUpdateBtn.classList.add('hidden');
-      openDownloadsBtn.classList.remove('hidden');
+      // Store the downloaded file path for install & restart
+      currentUpdateInfo.downloadedFilePath = result.filePath;
+      
+      // Update the download status message to show completion
+      if (updateDownloadStatus) {
+        updateDownloadStatus.textContent = '✅ Update downloaded successfully!';
+        updateDownloadStatus.style.color = 'var(--success-color)';
+      }
+      
+      // Wait a moment to show the success message, then switch to downloaded section
+      setTimeout(() => {
+        updateDownloadProgress.classList.add('hidden');
+        updateDownloaded.classList.remove('hidden');
+        downloadUpdateBtn.classList.add('hidden');
+        openDownloadsBtn.classList.remove('hidden');
+        installRestartBtn.classList.remove('hidden');
+      }, 500);
+      
       showStatus(`✅ Update downloaded to: ${result.fileName}`, 'success');
     } else {
       showStatus(`❌ Download failed: ${result.error}`, 'error');
@@ -1710,11 +1929,46 @@ async function handleOpenDownloadsFolder() {
   }
 }
 
+/**
+ * Handle install and restart
+ */
+async function handleInstallAndRestart() {
+  if (!currentUpdateInfo || !currentUpdateInfo.downloadedFilePath) {
+    showStatus('❌ Downloaded file path not available', 'error');
+    return;
+  }
+  
+  const confirmed = confirm('This will close the app, replace the old version, and launch the new version. Continue?');
+  if (!confirmed) {
+    return;
+  }
+  
+  installRestartBtn.disabled = true;
+  installRestartBtn.textContent = 'Installing...';
+  
+  try {
+    const result = await window.electronAPI.installAndRestart(currentUpdateInfo.downloadedFilePath);
+    if (result.success) {
+      showStatus('🔄 Installing update and restarting...', 'success');
+      // App will quit automatically
+    } else {
+      showStatus(`❌ Install failed: ${result.error}`, 'error');
+      installRestartBtn.disabled = false;
+      installRestartBtn.textContent = 'Install & Restart';
+    }
+  } catch (error) {
+    showStatus(`❌ Error: ${error.message}`, 'error');
+    installRestartBtn.disabled = false;
+    installRestartBtn.textContent = 'Install & Restart';
+  }
+}
+
 // Update modal event listeners
 closeUpdateModalBtn.addEventListener('click', closeUpdateModal);
 cancelUpdateBtn.addEventListener('click', closeUpdateModal);
 downloadUpdateBtn.addEventListener('click', handleDownloadUpdate);
 openDownloadsBtn.addEventListener('click', handleOpenDownloadsFolder);
+installRestartBtn.addEventListener('click', handleInstallAndRestart);
 
 // Close update modal when clicking outside
 updateModal.addEventListener('click', (e) => {

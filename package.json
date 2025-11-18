@@ -1,6 +1,6 @@
 {
   "name": "role-play-ai-environment-setup",
-  "version": "1.0.2",
+  "version": "1.0.1",
   "description": "VRC Character Updater - Electron application for managing JSONBin API configuration",
   "main": "src/main/main.js",
   "scripts": {
@@ -20,7 +20,7 @@
     "configuration",
     "vrc"
   ],
-  "author": "Nobel90",
+  "author": "VR Centre Pty Ltd",
   "license": "ISC",
   "repository": {
     "type": "git",
@@ -46,7 +46,7 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "Nobel90",
+      "owner": "VR Centre Pty Ltd",
       "repo": "Role-Play-Ai-Environment-Setup-"
     },
     "win": {
@@ -59,8 +59,15 @@
         }
       ],
       "artifactName": "${productName}-${version}-portable.${ext}",
-      "icon": "assets/icons/icon-white_s.ico"
+      "icon": "assets/icons/icon-white_s.ico",
+      "signAndEditExecutable": false,
+      "signtoolOptions": {
+        "signingHashAlgorithms": [
+          "sha256"
+        ]
+      }
     },
+    "afterSign": "sign.js",
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
     },
