@@ -4,6 +4,9 @@ directories:
   output: dist
   buildResources: build
 
+# Icon configuration - should be in buildResources directory
+icon: build/icon.ico
+
 # Optimize file inclusion - exclude unnecessary files
 files:
   - src/**/*
@@ -34,19 +37,25 @@ win:
       arch:
         - x64
   artifactName: ${productName}-${version}-portable.${ext}
-  icon: assets/icons/icon-white_s.ico
+  icon: build/icon.ico
   signtoolOptions:
     signingHashAlgorithms:
       - sha256
+  # Bundle Node.js runtime with the app for update mechanism
+  extraResources:
+    - from: node_modules/node/bin/node.exe
+      to: node.exe
+      filter:
+        - "**/*"
   # Code signing configuration for USB token
   # Uses certificate from Windows Certificate Store (USB token)
   # Set CSC_NAME environment variable to certificate subject name or thumbprint
   # If not set, will auto-detect the first available code signing certificate
-  # Custom signing is handled by afterSign hook (sign.js)
+  # Custom signing is handled by afterPack hook (sign.js)
 
-# Custom signing hook - runs after the final executable is built
+# Custom signing hook - runs after the executable is packed
 # We disable default signing and use our custom USB token signing
-afterSign: sign.js
+afterPack: sign.js
 
 portable:
   artifactName: ${productName}-${version}-portable.${ext}

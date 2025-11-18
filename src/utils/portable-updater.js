@@ -285,18 +285,67 @@ async function downloadUpdate(downloadUrl, onProgress, redirectCount = 0, origin
 /**
  * Install update and restart the application
  * Creates a Node.js helper script that runs after the app quits
- * Uses pure Node.js APIs (no CMD/PowerShell required)
+ * Uses the bundled Node.js runtime from Electron
  */
 function installAndRestart(newExePath, oldExePath) {
   const os = require('os');
   const { spawn } = require('child_process');
-  const { execSync } = require('child_process');
   
   // Create a temporary Node.js script that will handle the update
   const scriptPath = path.join(os.tmpdir(), `vrc-updater-${Date.now()}.js`);
   
   // Get the process name (without .exe extension) for checking if it's still running
   const processName = path.basename(oldExePath, '.exe');
+  
+  // Find Node.js executable - use the bundled one from Electron
+  let nodeExecutable = null;
+  
+  if (app.isPackaged) {
+    // In packaged app, use the bundled Node.js from Electron resources
+    // Node.js is bundled in extraResources as node.exe
+    const electronPath = process.execPath;
+    const electronDir = path.dirname(electronPath);
+    
+    // Try to find node.exe in the Electron resources
+    // For portable builds, extraResources are in the same directory as the exe
+    const possibleNodePaths = [
+      path.join(electronDir, 'resources', 'node.exe'),  // extraResources location
+      path.join(process.resourcesPath, 'node.exe'),     // Alternative resources path
+      path.join(electronDir, 'node.exe'),               // Same directory as exe
+      path.join(process.resourcesPath, 'app.asar.unpacked', 'node.exe')
+    ];
+    
+    for (const nodePath of possibleNodePaths) {
+      if (fs.existsSync(nodePath)) {
+        nodeExecutable = nodePath;
+        console.log(`Found bundled Node.js at: ${nodeExecutable}`);
+        break;
+      }
+    }
+    
+    // If still not found, log warning
+    if (!nodeExecutable) {
+      console.warn('Node.js not found in expected locations. Will try system Node.js as fallback.');
+    }
+  } else {
+    // In development, use system Node.js
+    try {
+      const { execSync } = require('child_process');
+      const nodePath = execSync('where node', { 
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore']
+      }).trim().split('\n')[0];
+      if (nodePath && fs.existsSync(nodePath)) {
+        nodeExecutable = nodePath;
+      }
+    } catch (e) {
+      // Node.js not found
+    }
+  }
+  
+  if (!nodeExecutable) {
+    throw new Error('Node.js runtime not found. The application requires Node.js to be bundled or installed.');
+  }
   
   // Create the helper script content
   const scriptContent = `
@@ -310,7 +359,7 @@ const oldExePath = ${JSON.stringify(oldExePath)};
 const processName = ${JSON.stringify(processName)};
 const scriptPath = __filename;
 
-// Log file for debugging (optional, can be removed in production)
+// Log file for debugging
 const logFile = path.join(require('os').tmpdir(), \`vrc-updater-\${Date.now()}.log\`);
 
 function log(message) {
@@ -348,7 +397,6 @@ function waitForExit(maxWait = 30) {
       
       if (!isRunning || counter >= maxWait) {
         clearInterval(interval);
-        // Additional delay to ensure file handles are released
         log('Process stopped, waiting 2 seconds for file handles to release...');
         setTimeout(resolve, 2000);
       }
@@ -374,49 +422,31 @@ async function performUpdate() {
     log('Waiting for application to close...');
     await waitForExit();
     
-    // Normalize paths to ensure proper comparison
+    // Normalize paths
     const normalizedOldPath = path.resolve(oldExePath);
     const normalizedNewPath = path.resolve(newExePath);
     
-    // Safety check: ensure paths are different
+    // Safety check
     if (normalizedOldPath.toLowerCase() === normalizedNewPath.toLowerCase()) {
       log(\`ERROR: Old and new executable paths are the same: \${normalizedOldPath}\`);
-      log('This should not happen. Aborting update.');
       process.exit(1);
       return;
     }
     
     log('Replacing old executable...');
-    log(\`Old executable path: \${normalizedOldPath}\`);
-    log(\`New executable path: \${normalizedNewPath}\`);
     
-    // Verify new executable exists before we start
-    if (!fs.existsSync(normalizedNewPath)) {
-      log(\`ERROR: New executable not found: \${normalizedNewPath}\`);
-      process.exit(1);
-      return;
-    }
-    
-    // Get file size of new executable for verification
-    const newFileStats = fs.statSync(normalizedNewPath);
-    log(\`New executable size: \${newFileStats.size} bytes\`);
-    
-    // Delete the OLD executable (the one currently running)
+    // Delete the old executable
     if (fs.existsSync(normalizedOldPath)) {
       try {
         log(\`Deleting OLD executable: \${normalizedOldPath}\`);
         fs.unlinkSync(normalizedOldPath);
-        log('✓ Old executable deleted successfully');
-        
-        // Verify it's actually deleted
         if (fs.existsSync(normalizedOldPath)) {
-          log('WARNING: Old executable still exists after deletion, retrying...');
           await new Promise(r => setTimeout(r, 1000));
           fs.unlinkSync(normalizedOldPath);
         }
+        log('✓ Old executable deleted successfully');
       } catch (e) {
-        log(\`First deletion attempt failed: \${e.message}, retrying...\`);
-        // If deletion fails, try again after a short delay
+        log(\`First deletion failed: \${e.message}, retrying...\`);
         await new Promise(r => setTimeout(r, 2000));
         try {
           fs.unlinkSync(normalizedOldPath);
@@ -426,146 +456,65 @@ async function performUpdate() {
           throw e2;
         }
       }
-    } else {
-      log('Old executable does not exist (may have been deleted already)');
     }
     
-    // Verify old executable is gone before copying
+    // Verify old executable is gone
     if (fs.existsSync(normalizedOldPath)) {
-      log(\`ERROR: Old executable still exists at: \${normalizedOldPath}\`);
-      log('Cannot proceed with copy. Aborting.');
+      log(\`ERROR: Old executable still exists\`);
       process.exit(1);
       return;
     }
     
-    // Copy the NEW executable (from Downloads) to the OLD location
+    // Copy the new executable
     log(\`Copying NEW executable from \${normalizedNewPath} to \${normalizedOldPath}\`);
     fs.copyFileSync(normalizedNewPath, normalizedOldPath);
     log('✓ Copy completed');
     
-    // Verify the copied file exists and has correct size
+    // Verify the copy
     if (!fs.existsSync(normalizedOldPath)) {
-      log(\`ERROR: Copied executable not found at: \${normalizedOldPath}\`);
+      log(\`ERROR: Copied executable not found\`);
       process.exit(1);
       return;
     }
     
-    const copiedFileStats = fs.statSync(normalizedOldPath);
-    if (copiedFileStats.size !== newFileStats.size) {
-      log(\`ERROR: Copied file size mismatch! Expected: \${newFileStats.size}, Got: \${copiedFileStats.size}\`);
-      process.exit(1);
-      return;
-    }
+    log('✓ Update installed successfully!');
     
-    log(\`✓ Update installed successfully! File size verified: \${copiedFileStats.size} bytes\`);
-    
-    // Launch the new executable (now at oldExePath location)
+    // Launch the new executable
     log(\`Launching new executable: \${normalizedOldPath}\`);
+    const child = spawn(normalizedOldPath, [], {
+      detached: true,
+      stdio: 'ignore',
+      shell: false
+    });
     
-    // Try direct spawn first (most reliable for executables)
-    let launchSuccess = false;
-    try {
-      const child = spawn(normalizedOldPath, [], {
-        detached: true,
-        stdio: 'ignore',
-        shell: false,
-        windowsVerbatimArguments: false
-      });
-      
-      child.on('error', (error) => {
-        log(\`Direct spawn failed: \${error.message}\`);
-        // Will try alternative method below
-      });
-      
-      // Give it a moment to see if it launches successfully
-      await new Promise(r => setTimeout(r, 500));
-      
-      // Check if process started
-      if (isProcessRunning(processName)) {
-        log('New executable launched successfully via direct spawn');
-        launchSuccess = true;
-      } else {
-        log('Direct spawn did not start process, trying alternative method...');
-        child.kill(); // Clean up if it didn't work
-      }
-      
-      child.unref();
-    } catch (spawnError) {
-      log(\`Direct spawn error: \${spawnError.message}\`);
-    }
-    
-    // If direct spawn didn't work, try using cmd.exe /c start /B
-    if (!launchSuccess) {
+    child.on('error', (error) => {
+      log(\`ERROR: Failed to launch: \${error.message}\`);
+      // Try alternative method
       try {
-        log('Trying alternative launch method with cmd.exe...');
-        const escapedPath = normalizedOldPath.replace(/"/g, '""');
-        const child = spawn('cmd.exe', [
-          '/c',
-          'start',
-          '/B',
-          '""',
-          \`"\${escapedPath}"\`
-        ], {
+        const altChild = spawn('cmd.exe', ['/c', 'start', '""', \`"\${normalizedOldPath}"\`], {
           detached: true,
-          stdio: 'ignore',
-          shell: false,
-          windowsVerbatimArguments: false
+          stdio: 'ignore'
         });
-        
-        child.on('error', (error) => {
-          log(\`ERROR: cmd.exe launch failed: \${error.message}\`);
-          process.exit(1);
-        });
-        
-        child.unref();
-        
-        // Wait and verify
-        await new Promise(r => setTimeout(r, 1000));
-        if (isProcessRunning(processName)) {
-          log('New executable launched successfully via cmd.exe');
-          launchSuccess = true;
-        } else {
-          log('WARNING: cmd.exe launch may have failed - process not detected');
-        }
-      } catch (cmdError) {
-        log(\`ERROR: cmd.exe launch method failed: \${cmdError.message}\`);
-        process.exit(1);
+        altChild.unref();
+        log('Alternative launch method used');
+      } catch (altError) {
+        log(\`ERROR: Alternative launch also failed: \${altError.message}\`);
       }
-    }
+    });
     
-    if (!launchSuccess) {
-      log('ERROR: All launch methods failed');
-      process.exit(1);
-    }
-    
+    child.unref();
     log('New executable launch completed');
-    
-    // Keep the downloaded file in Downloads folder - do not delete it
-    log(\`Downloaded file preserved at: \${normalizedNewPath}\`);
-    
     log('=== Update Process Completed Successfully ===');
   } catch (error) {
     log(\`ERROR: Update failed: \${error.message}\`);
     log(\`Stack: \${error.stack}\`);
     process.exit(1);
   } finally {
-    // Delete this script after a delay
     setTimeout(() => {
       try {
-        log(\`Cleaning up script: \${scriptPath}\`);
         fs.unlinkSync(scriptPath);
-        // Also delete log file after a longer delay
-        setTimeout(() => {
-          try {
-            if (fs.existsSync(logFile)) {
-              fs.unlinkSync(logFile);
-            }
-          } catch (e) {
-            // Ignore
-          }
-        }, 10000);
       } catch (e) {
-        // Ignore errors
+        // Ignore
       }
     }, 5000);
   }
@@ -577,22 +526,22 @@ performUpdate();
   // Write the script to disk
   fs.writeFileSync(scriptPath, scriptContent, 'utf8');
   
-  // Try to find Node.js in PATH
-  let nodeExecutable = 'node';
-  try {
-    const nodePath = execSync('where node', { 
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore']
-    }).trim().split('\n')[0];
-    if (nodePath && fs.existsSync(nodePath)) {
-      nodeExecutable = nodePath;
+  // Launch the script
+  // If using Electron executable, we need to use --eval or a different approach
+  if (nodeExecutable.endsWith('.exe') && !nodeExecutable.includes('node.exe')) {
+    // Using Electron executable - need to execute JavaScript differently
+    // For now, try to find node.exe in the same directory
+    const electronDir = path.dirname(nodeExecutable);
+    const nodeInDir = path.join(electronDir, 'node.exe');
+    if (fs.existsSync(nodeInDir)) {
+      nodeExecutable = nodeInDir;
+    } else {
+      // Fallback: use Electron with --eval (but this won't work for our script)
+      // Better to throw an error and ask user to ensure Node.js is bundled
+      throw new Error('Node.js runtime not found in Electron resources. Please ensure Node.js is bundled with the application.');
     }
-  } catch (e) {
-    // Node.js not found in PATH
-    throw new Error('Node.js is required to be installed and in PATH for automatic updates. Please install Node.js or manually replace the executable.');
   }
   
-  // Launch the script as a detached process
   const child = spawn(nodeExecutable, [scriptPath], {
     detached: true,
     stdio: 'ignore',

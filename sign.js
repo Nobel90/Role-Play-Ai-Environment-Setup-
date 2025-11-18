@@ -182,36 +182,187 @@ function verifySignature(filePath) {
   }
 }
 
-// Export for electron-builder afterSign hook
-// electron-builder calls this function with context: { path, isAsar, platform, arch }
-// The 'path' contains the path to the signed file (or file to be signed)
-module.exports = function(context) {
+// Export for electron-builder afterPack hook
+// electron-builder calls this function with context: { appOutDir, outDir, arch, platform, electronPlatformName, ... }
+// For portable builds, we need to find the .exe file in the output directory
+module.exports = async function(context) {
+  console.log('\n=== afterPack hook called ===');
+  console.log('Context:', JSON.stringify({
+    platform: context.platform,
+    electronPlatformName: context.electronPlatformName,
+    appOutDir: context.appOutDir,
+    outDir: context.outDir,
+    path: context.path
+  }, null, 2));
+  
   // For Windows, sign the executable
-  if (context.platform === 'win32') {
-    const filePath = context.path;
+  if (context.platform === 'win32' || context.electronPlatformName === 'win32') {
+    // For portable builds, the executable might be in different locations
+    // Try multiple possible locations
+    const possibleDirs = [
+      context.appOutDir,
+      context.outDir,
+      context.outDir ? path.join(context.outDir, 'win-unpacked') : null,
+      context.path ? path.dirname(context.path) : null
+    ].filter(Boolean);
     
-    if (!filePath) {
-      console.warn('No file path provided in context');
+    let exePath = null;
+    
+    // First, try to find the .exe in the output directories
+    for (const dir of possibleDirs) {
+      if (!dir || !fs.existsSync(dir)) continue;
+      
+      try {
+        const files = fs.readdirSync(dir);
+        const exeFile = files.find(f => f.endsWith('.exe') && !f.includes('unpacked') && !f.includes('Helper'));
+        if (exeFile) {
+          exePath = path.join(dir, exeFile);
+          console.log(`Found executable in ${dir}: ${exeFile}`);
+          break;
+        }
+      } catch (error) {
+        console.warn(`Could not read directory ${dir}: ${error.message}`);
+      }
+    }
+    
+    // Fallback: try context.path if available
+    if (!exePath && context.path && context.path.endsWith('.exe')) {
+      exePath = context.path;
+      console.log(`Using executable from context.path: ${exePath}`);
+    }
+    
+    // Last resort: look in the dist directory
+    if (!exePath) {
+      const distDir = path.join(process.cwd(), 'dist');
+      if (fs.existsSync(distDir)) {
+        try {
+          const files = fs.readdirSync(distDir);
+          const exeFile = files.find(f => f.endsWith('.exe') && f.includes('portable'));
+          if (exeFile) {
+            exePath = path.join(distDir, exeFile);
+            console.log(`Found executable in dist directory: ${exeFile}`);
+          }
+        } catch (error) {
+          console.warn(`Could not read dist directory: ${error.message}`);
+        }
+      }
+    }
+    
+    if (!exePath) {
+      console.error('✗ Could not find executable file to sign');
+      console.error('Searched in:', possibleDirs);
       return;
     }
     
     // Check if this is an executable file
-    if (filePath.endsWith('.exe') || filePath.endsWith('.dll')) {
-      console.log(`Signing executable with USB token certificate: ${filePath}`);
+    if (exePath.endsWith('.exe') || exePath.endsWith('.dll')) {
+      console.log(`\n=== Processing executable ===`);
+      console.log(`Executable path: ${exePath}`);
       try {
-        signFile(filePath);
+        // Apply icon BEFORE signing (signing can prevent icon changes)
+        await applyIcon(exePath);
+        
+        signFile(exePath);
         console.log('✓ Custom signing completed');
       } catch (error) {
         console.error('✗ Custom signing failed:', error.message);
+        console.error('Error stack:', error.stack);
         // Don't throw - let electron-builder continue even if custom signing fails
         // But log it clearly so user knows signing didn't happen
         console.error('⚠ WARNING: Executable was NOT signed!');
       }
     } else {
-      console.log(`Skipping signing for non-executable file: ${filePath}`);
+      console.log(`Skipping signing for non-executable file: ${exePath}`);
     }
   }
 };
+
+/**
+ * Apply icon to executable using rcedit
+ * This ensures the icon is applied even if electron-builder didn't do it
+ */
+async function applyIcon(exePath) {
+  console.log(`\n=== Applying icon to executable ===`);
+  console.log(`Executable path: ${exePath}`);
+  
+  // Ensure build directory and icon exist
+  const buildDir = path.join(process.cwd(), 'build');
+  const buildIconPath = path.join(buildDir, 'icon.ico');
+  const sourceIconPath = path.join(process.cwd(), 'assets/icons/icon-white_s.ico');
+  
+  console.log(`Checking for icon at: ${buildIconPath}`);
+  console.log(`Source icon at: ${sourceIconPath}`);
+  
+  // Copy icon to build directory if it doesn't exist
+  if (!fs.existsSync(buildIconPath) && fs.existsSync(sourceIconPath)) {
+    if (!fs.existsSync(buildDir)) {
+      fs.mkdirSync(buildDir, { recursive: true });
+    }
+    fs.copyFileSync(sourceIconPath, buildIconPath);
+    console.log(`✓ Copied icon to build directory: ${buildIconPath}`);
+  }
+  
+  // Try multiple possible icon paths (use absolute paths)
+  const possibleIconPaths = [
+    path.resolve(buildIconPath),
+    path.resolve(path.join(process.cwd(), 'build/icon.ico')),
+    path.resolve(sourceIconPath),
+    path.resolve(path.join(__dirname, '../build/icon.ico')),
+    path.resolve(path.join(__dirname, '../../build/icon.ico')),
+    buildIconPath,
+    sourceIconPath
+  ];
+  
+  let iconPath = null;
+  for (const testPath of possibleIconPaths) {
+    const absPath = path.isAbsolute(testPath) ? testPath : path.resolve(testPath);
+    console.log(`Checking icon path: ${absPath} (exists: ${fs.existsSync(absPath)})`);
+    if (fs.existsSync(absPath)) {
+      iconPath = absPath;
+      console.log(`✓ Found icon at: ${iconPath}`);
+      break;
+    }
+  }
+  
+  if (!iconPath) {
+    console.error('✗ Icon file not found in any expected location');
+    console.error('Tried paths:');
+    possibleIconPaths.forEach(p => console.error(`  - ${path.isAbsolute(p) ? p : path.resolve(p)}`));
+    return;
+  }
+  
+  // Ensure exePath is absolute
+  const absoluteExePath = path.isAbsolute(exePath) ? exePath : path.resolve(exePath);
+  if (!fs.existsSync(absoluteExePath)) {
+    console.error(`✗ Executable not found: ${absoluteExePath}`);
+    return;
+  }
+  
+  // Try to use rcedit to apply the icon
+  try {
+    const rceditModule = require('rcedit');
+    const rcedit = rceditModule.rcedit || rceditModule;
+    console.log(`Applying icon to executable using rcedit...`);
+    console.log(`  Executable: ${absoluteExePath}`);
+    console.log(`  Icon: ${iconPath}`);
+    
+    // rcedit can be async, so handle both sync and async cases
+    const result = rcedit(absoluteExePath, {
+      icon: iconPath
+    });
+    
+    // If it returns a promise, wait for it
+    if (result && typeof result.then === 'function') {
+      await result;
+    }
+    
+    console.log('✓ Icon applied to executable successfully');
+  } catch (error) {
+    console.error(`✗ Could not apply icon via rcedit: ${error.message}`);
+    console.error(`  Error details: ${error.stack || error}`);
+    console.warn('The icon should have been applied by electron-builder during the build process');
+  }
+}
 
 // Also export functions for direct use
 module.exports.sign = signFile;
