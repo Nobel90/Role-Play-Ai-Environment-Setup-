@@ -9,6 +9,7 @@ const fs = require('fs');
 const { fetchJson, uploadJson } = require('../api/jsonbin-client');
 const { readJsonFile, writeJsonFile, validateJson } = require('../utils/file-handler');
 const { checkForUpdates, downloadUpdate, installAndRestart } = require('../utils/portable-updater');
+const { getCurrentEnvironment, getEnvironments, setCurrentEnvironment } = require('../config/settings');
 
 let mainWindow;
 
@@ -190,6 +191,42 @@ ipcMain.handle('install-and-restart', async (event, newExePath) => {
     return { success: true, ...result };
   } catch (error) {
     console.error('Install and restart error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Environment management IPC handlers
+ipcMain.handle('get-current-environment', () => {
+  try {
+    const env = getCurrentEnvironment();
+    const environments = getEnvironments();
+    const envInfo = environments.find(e => e.id === env);
+    return { success: true, environment: env, name: envInfo ? envInfo.name : env };
+  } catch (error) {
+    console.error('Get current environment error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('set-current-environment', (event, envName) => {
+  try {
+    setCurrentEnvironment(envName);
+    const env = getCurrentEnvironment();
+    const environments = getEnvironments();
+    const envInfo = environments.find(e => e.id === env);
+    return { success: true, environment: env, name: envInfo ? envInfo.name : env };
+  } catch (error) {
+    console.error('Set current environment error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-environments', () => {
+  try {
+    const environments = getEnvironments();
+    return { success: true, environments };
+  } catch (error) {
+    console.error('Get environments error:', error);
     return { success: false, error: error.message };
   }
 });

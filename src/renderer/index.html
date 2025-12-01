@@ -13,6 +13,8 @@
         <header class="header">
             <h1 class="title">VRC Character Updater</h1>
             <div class="header-actions">
+                <span id="environmentIndicator" class="environment-badge" title="Current Environment">Production</span>
+                <button id="settingsBtn" class="btn btn-info" title="Settings">⚙ Settings</button>
                 <button id="checkUpdatesBtn" class="btn btn-info">Check for Updates</button>
                 <button id="viewModeBtn" class="btn btn-info">JSON Mode</button>
                 <button id="reloadBtn" class="btn btn-secondary">Reload JSON</button>
@@ -137,6 +139,33 @@
                         <button type="button" id="openDownloadsBtn" class="btn btn-info hidden">Open Downloads Folder</button>
                         <button type="button" id="installRestartBtn" class="btn btn-primary hidden">Install & Restart</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Settings</h3>
+                    <button id="closeSettingsModalBtn" class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="settingsForm">
+                        <div class="form-group">
+                            <label for="environmentSelect">Environment *</label>
+                            <select id="environmentSelect" class="form-input form-select" required>
+                                <option value="">Loading environments...</option>
+                            </select>
+                            <small class="form-note" style="display: block; margin-top: 0.5rem;">
+                                Note: Environment selection does not persist. The app always defaults to Production on startup.
+                            </small>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="cancelSettingsBtn" class="btn btn-secondary">Cancel</button>
+                            <button type="submit" id="saveSettingsBtn" class="btn btn-success">Save</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

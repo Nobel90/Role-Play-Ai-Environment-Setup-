@@ -59,6 +59,8 @@ const loadFileBtn = document.getElementById('loadFileBtn');
 const saveFileBtn = document.getElementById('saveFileBtn');
 const uploadBtn = document.getElementById('uploadBtn');
 const statusMessage = document.getElementById('statusMessage');
+const settingsBtn = document.getElementById('settingsBtn');
+const environmentIndicator = document.getElementById('environmentIndicator');
 
 // View Mode Elements
 const viewModeBtn = document.getElementById('viewModeBtn');
@@ -78,6 +80,14 @@ const scenarioForm = document.getElementById('scenarioForm');
 const closeModalBtn = document.getElementById('closeModalBtn');
 const cancelScenarioBtn = document.getElementById('cancelScenarioBtn');
 const saveScenarioBtn = document.getElementById('saveScenarioBtn');
+
+// Settings Modal Elements
+const settingsModal = document.getElementById('settingsModal');
+const settingsForm = document.getElementById('settingsForm');
+const environmentSelect = document.getElementById('environmentSelect');
+const closeSettingsModalBtn = document.getElementById('closeSettingsModalBtn');
+const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 
 // State
 let currentViewMode = 'visual'; // 'json' or 'visual'
@@ -1562,6 +1572,29 @@ scenarioForm.addEventListener('submit', (e) => {
   saveScenario();
 });
 
+// Settings modal event listeners
+if (settingsBtn) {
+  settingsBtn.addEventListener('click', openSettingsModal);
+}
+if (closeSettingsModalBtn) {
+  closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
+}
+if (cancelSettingsBtn) {
+  cancelSettingsBtn.addEventListener('click', closeSettingsModal);
+}
+if (settingsForm) {
+  settingsForm.addEventListener('submit', handleSaveSettings);
+}
+
+// Close settings modal when clicking outside
+if (settingsModal) {
+  settingsModal.addEventListener('click', (e) => {
+    if (e.target === settingsModal) {
+      closeSettingsModal();
+    }
+  });
+}
+
 // Close modal when clicking outside
 scenarioModal.addEventListener('click', (e) => {
   if (e.target === scenarioModal) {
@@ -1569,8 +1602,136 @@ scenarioModal.addEventListener('click', (e) => {
   }
 });
 
+/**
+ * Load current environment and update indicator
+ */
+async function loadCurrentEnvironment() {
+  try {
+    const result = await window.electronAPI.getCurrentEnvironment();
+    if (result.success) {
+      updateEnvironmentIndicator(result.environment, result.name);
+      // Populate environment select in settings modal
+      await populateEnvironmentSelect();
+      // Set current selection in dropdown
+      if (environmentSelect) {
+        environmentSelect.value = result.environment;
+      }
+    }
+  } catch (error) {
+    console.error('Error loading current environment:', error);
+  }
+}
+
+/**
+ * Update environment indicator in header
+ * @param {string} envId - Environment ID ('production' or 'staging')
+ * @param {string} envName - Environment display name
+ */
+function updateEnvironmentIndicator(envId, envName) {
+  if (environmentIndicator) {
+    environmentIndicator.textContent = envName || envId;
+    // Update badge class
+    environmentIndicator.className = 'environment-badge';
+    if (envId === 'production') {
+      environmentIndicator.classList.add('production');
+    } else if (envId === 'staging') {
+      environmentIndicator.classList.add('staging');
+    }
+    environmentIndicator.title = `Current Environment: ${envName || envId}`;
+  }
+}
+
+/**
+ * Populate environment select dropdown
+ */
+async function populateEnvironmentSelect() {
+  try {
+    const result = await window.electronAPI.getEnvironments();
+    if (result.success && environmentSelect) {
+      environmentSelect.innerHTML = '<option value="">Select an environment...</option>';
+      result.environments.forEach(env => {
+        const option = document.createElement('option');
+        option.value = env.id;
+        option.textContent = env.name;
+        environmentSelect.appendChild(option);
+      });
+    }
+  } catch (error) {
+    console.error('Error populating environments:', error);
+    if (environmentSelect) {
+      environmentSelect.innerHTML = '<option value="">Error loading environments</option>';
+    }
+  }
+}
+
+/**
+ * Open settings modal
+ */
+async function openSettingsModal() {
+  if (settingsModal) {
+    // Load current environment and populate dropdown
+    await loadCurrentEnvironment();
+    settingsModal.classList.remove('hidden');
+  }
+}
+
+/**
+ * Close settings modal
+ */
+function closeSettingsModal() {
+  if (settingsModal) {
+    settingsModal.classList.add('hidden');
+    if (settingsForm) {
+      settingsForm.reset();
+    }
+  }
+}
+
+/**
+ * Handle settings form submission
+ */
+async function handleSaveSettings(e) {
+  e.preventDefault();
+  
+  if (!environmentSelect || !environmentSelect.value) {
+    showStatus('⚠️ Please select an environment', 'error');
+    return;
+  }
+  
+  try {
+    saveSettingsBtn.disabled = true;
+    saveSettingsBtn.textContent = 'Saving...';
+    
+    const selectedEnv = environmentSelect.value;
+    const result = await window.electronAPI.setCurrentEnvironment(selectedEnv);
+    
+    if (result.success) {
+      updateEnvironmentIndicator(result.environment, result.name);
+      closeSettingsModal();
+      showStatus(`✅ Switched to ${result.name} environment. Reloading data...`, 'success');
+      
+      // Reload JSON data from the new environment
+      setTimeout(() => {
+        handleFetchJson();
+      }, 500);
+    } else {
+      showStatus(`❌ Failed to switch environment: ${result.error}`, 'error');
+    }
+  } catch (error) {
+    showStatus(`❌ Error: ${error.message}`, 'error');
+  } finally {
+    if (saveSettingsBtn) {
+      saveSettingsBtn.disabled = false;
+      saveSettingsBtn.textContent = 'Save';
+    }
+  }
+}
+
 // Load JSON on startup
 window.addEventListener('DOMContentLoaded', () => {
+  // Load current environment first
+  loadCurrentEnvironment();
+  // Then load JSON data
   handleFetchJson();
 });
 

@@ -34,6 +34,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Error handling
   onError: (callback) => ipcRenderer.on('error', (event, error) => callback(error)),
-  onSuccess: (callback) => ipcRenderer.on('success', (event, message) => callback(message))
+  onSuccess: (callback) => ipcRenderer.on('success', (event, message) => callback(message)),
+  
+  // Environment management
+  getCurrentEnvironment: () => ipcRenderer.invoke('get-current-environment'),
+  setCurrentEnvironment: (envName) => ipcRenderer.invoke('set-current-environment', envName),
+  getEnvironments: () => ipcRenderer.invoke('get-environments')
 });
 
