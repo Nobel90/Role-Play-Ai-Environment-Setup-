@@ -1,6 +1,6 @@
 {
   "name": "role-play-ai-environment-setup",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "VRC Character Updater - Electron application for managing JSONBin API configuration",
   "main": "src/main/main.js",
   "scripts": {
@@ -52,6 +52,8 @@
       "owner": "VR Centre Pty Ltd",
       "repo": "Role-Play-Ai-Environment-Setup-"
     },
+    "afterSign": "scripts/sign-app.js",
+    "afterAllArtifactBuild": "scripts/sign-installer.js",
     "win": {
       "target": [
         {
@@ -63,7 +65,7 @@
       ],
       "artifactName": "${productName}-${version}-portable.${ext}",
       "icon": "build/icon.ico",
-      "signAndEditExecutable": false,
+      "signAndEditExecutable": true,
       "signtoolOptions": {
         "signingHashAlgorithms": [
           "sha256"
@@ -79,7 +81,6 @@
         }
       ]
     },
-    "afterPack": "sign.js",
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
     },
