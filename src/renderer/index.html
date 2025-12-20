@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
     <title>VRC Character Updater</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <div class="container">
         <!-- Header -->
@@ -41,12 +44,8 @@
 
             <!-- JSON Mode: Raw JSON Editor -->
             <div id="jsonMode" class="view-mode hidden">
-                <textarea 
-                    id="jsonTextArea" 
-                    class="json-editor" 
-                    placeholder="JSON data will appear here..."
-                    spellcheck="false"
-                ></textarea>
+                <textarea id="jsonTextArea" class="json-editor" placeholder="JSON data will appear here..."
+                    spellcheck="false"></textarea>
             </div>
         </main>
 
@@ -61,28 +60,33 @@
                     <form id="scenarioForm">
                         <div class="form-group">
                             <label for="scenarioTitle">Title *</label>
-                            <input type="text" id="scenarioTitle" class="form-input" required 
-                                   placeholder="e.g., Having Difficult Conversations">
+                            <input type="text" id="scenarioTitle" class="form-input" required
+                                placeholder="e.g., Having Difficult Conversations">
                         </div>
                         <div class="form-group">
                             <label for="scenarioCharacterId">Character ID *</label>
-                            <input type="text" id="scenarioCharacterId" class="form-input" required 
-                                   placeholder="Convai Character ID">
+                            <input type="text" id="scenarioCharacterId" class="form-input" required
+                                placeholder="Convai Character ID">
                         </div>
                         <div class="form-group">
-                            <label for="scenarioEnvironment">Environment *</label>
-                            <select id="scenarioEnvironment" class="form-input form-select" required>
-                                <option value="">Select an environment...</option>
-                                <option value="Hospital - Betty">Hospital - Betty</option>
-                                <option value="Hospital - Joshua">Hospital - Joshua</option>
-                                <option value="Hospital - David">Hospital - David</option>
-                                <option value="Hospital - Rachael">Hospital - Rachael</option>
-                            </select>
+                            <label for="scenarioCharacterName">Character Name (optional)</label>
+                            <input type="text" id="scenarioCharacterName" class="form-input"
+                                placeholder="e.g., Betty, Joshua">
+                        </div>
+                        <div class="form-group">
+                            <label for="scenarioEnvironmentId">Environment ID (optional)</label>
+                            <input type="text" id="scenarioEnvironmentId" class="form-input"
+                                placeholder="e.g., BDS_Hospital">
+                        </div>
+                        <div class="form-group">
+                            <label for="scenarioEnvironmentName">Environment Name *</label>
+                            <input type="text" id="scenarioEnvironmentName" class="form-input" required
+                                placeholder="e.g., Hospital - Betty">
                         </div>
                         <div class="form-group">
                             <label for="scenarioGreeting">Greeting *</label>
                             <textarea id="scenarioGreeting" class="form-textarea" rows="3" required
-                                      placeholder="AI greeting message when experience starts"></textarea>
+                                placeholder="AI greeting message when experience starts"></textarea>
                         </div>
                         <div class="form-note">
                             <small>Note: Column, Row, and Button Index are auto-generated based on position.</small>
@@ -118,26 +122,38 @@
                 </div>
                 <div class="modal-body">
                     <div id="updateInfo">
-                        <p id="updateStatusMessage" style="margin: 0.5rem 0; font-size: 0.85rem;">Update available for download</p>
-                        <p style="margin: 0.5rem 0; font-size: 0.85rem;"><strong>Current Version:</strong> <span id="currentVersion">-</span></p>
-                        <p style="margin: 0.5rem 0; font-size: 0.85rem;"><strong>Latest Version:</strong> <span id="latestVersion">-</span></p>
-                        <div id="updateReleaseNotes" class="form-note" style="margin-top: 1rem; max-height: 400px; overflow-y: auto; font-size: 0.8rem;"></div>
+                        <p id="updateStatusMessage" style="margin: 0.5rem 0; font-size: 0.85rem;">Update available for
+                            download</p>
+                        <p style="margin: 0.5rem 0; font-size: 0.85rem;"><strong>Current Version:</strong> <span
+                                id="currentVersion">-</span></p>
+                        <p style="margin: 0.5rem 0; font-size: 0.85rem;"><strong>Latest Version:</strong> <span
+                                id="latestVersion">-</span></p>
+                        <div id="updateReleaseNotes" class="form-note"
+                            style="margin-top: 1rem; max-height: 400px; overflow-y: auto; font-size: 0.8rem;"></div>
                     </div>
                     <div id="updateDownloadProgress" class="hidden" style="margin-top: 1rem;">
-                        <p id="updateDownloadStatus" style="margin: 0.5rem 0; font-size: 0.85rem;">Downloading update...</p>
-                        <div style="background: var(--bg-secondary); border-radius: 4px; padding: 3px; margin-top: 0.5rem;">
-                            <div id="updateProgressBar" style="background: var(--primary-color); height: 16px; border-radius: 4px; width: 0%; transition: width 0.3s;"></div>
+                        <p id="updateDownloadStatus" style="margin: 0.5rem 0; font-size: 0.85rem;">Downloading update...
+                        </p>
+                        <div
+                            style="background: var(--bg-secondary); border-radius: 4px; padding: 3px; margin-top: 0.5rem;">
+                            <div id="updateProgressBar"
+                                style="background: var(--primary-color); height: 16px; border-radius: 4px; width: 0%; transition: width 0.3s;">
+                            </div>
                         </div>
-                        <p id="updateProgressText" style="text-align: center; margin-top: 0.5rem; font-size: 0.8rem;">0%</p>
+                        <p id="updateProgressText" style="text-align: center; margin-top: 0.5rem; font-size: 0.8rem;">0%
+                        </p>
                     </div>
                     <div id="updateDownloaded" class="hidden" style="margin-top: 1rem;">
-                        <p style="font-size: 0.85rem; line-height: 1.4;">The new version has been saved to your Downloads folder. Please close this app and replace the old executable with the new one.</p>
+                        <p style="font-size: 0.85rem; line-height: 1.4;">The new version has been saved to your
+                            Downloads folder. Please close this app and replace the old executable with the new one.</p>
                     </div>
                     <div class="form-actions" style="margin-top: 1.25rem;">
                         <button type="button" id="cancelUpdateBtn" class="btn btn-secondary">Later</button>
                         <button type="button" id="downloadUpdateBtn" class="btn btn-success">Download Update</button>
-                        <button type="button" id="openDownloadsBtn" class="btn btn-info hidden">Open Downloads Folder</button>
-                        <button type="button" id="installRestartBtn" class="btn btn-primary hidden">Install & Restart</button>
+                        <button type="button" id="openDownloadsBtn" class="btn btn-info hidden">Open Downloads
+                            Folder</button>
+                        <button type="button" id="installRestartBtn" class="btn btn-primary hidden">Install &
+                            Restart</button>
                     </div>
                 </div>
             </div>
@@ -158,7 +174,8 @@
                                 <option value="">Loading environments...</option>
                             </select>
                             <small class="form-note" style="display: block; margin-top: 0.5rem;">
-                                Note: Environment selection does not persist. The app always defaults to Production on startup.
+                                Note: Environment selection does not persist. The app always defaults to Production on
+                                startup.
                             </small>
                         </div>
                         <div class="form-actions">
@@ -176,5 +193,5 @@
 
     <script src="renderer.js"></script>
 </body>
-</html>
 
+</html>

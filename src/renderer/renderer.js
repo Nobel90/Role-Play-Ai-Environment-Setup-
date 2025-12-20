@@ -4,39 +4,6 @@
  */
 
 /**
- * Environment dropdown options mapping
- * Maps display names to JSON values for UE5
- */
-const ENVIRONMENT_OPTIONS = [
-  { display: 'Hospital - Betty', value: 'BDS_Hospital' },
-  { display: 'Hospital - Joshua', value: 'BDS_Hospital_Male' },
-  { display: 'Hospital - David', value: 'BDS_Hospital_Male_David' },
-  { display: 'Hospital - Rachael', value: 'BDS_Hospital_Rachael' }
-];
-
-/**
- * Get environment display name from value
- * @param {string} value - Environment value (e.g., "BDS_Hospital")
- * @returns {string} Display name or value if not found
- */
-function getEnvironmentDisplayName(value) {
-  if (!value) return 'Not specified';
-  const option = ENVIRONMENT_OPTIONS.find(opt => opt.value === value);
-  return option ? option.display : value;
-}
-
-/**
- * Get environment value from display name
- * @param {string} displayName - Environment display name (e.g., "Hospital - Betty")
- * @returns {string} Environment value or displayName if not found
- */
-function getEnvironmentValue(displayName) {
-  if (!displayName) return '';
-  const option = ENVIRONMENT_OPTIONS.find(opt => opt.display === displayName);
-  return option ? option.value : displayName;
-}
-
-/**
  * Format JSON with indentation
  * @param {Object|string} data - JSON object or string
  * @param {number} indent - Number of spaces for indentation
@@ -110,7 +77,7 @@ function showStatus(message, type = 'success') {
   statusMessage.textContent = message;
   statusMessage.className = `status-message ${type}`;
   statusMessage.classList.remove('hidden');
-  
+
   // Auto-hide after 3 seconds
   setTimeout(() => {
     statusMessage.classList.add('hidden');
@@ -148,10 +115,10 @@ function displayJson(data) {
     currentJsonData = deepClone(data);
     const formatted = formatJson(data, 4);
     jsonTextArea.value = formatted;
-    
+
     // Reset and refresh grid when loading new data
     refreshGridInternal();
-    
+
     // Update visual mode if active
     if (currentViewMode === 'visual') {
       renderScenarios();
@@ -169,9 +136,9 @@ function displayJson(data) {
  */
 function parseScenarios(data) {
   if (!data) return [];
-  
+
   let scenarios = [];
-  
+
   // If data is an array, use it directly
   if (Array.isArray(data)) {
     scenarios = data;
@@ -193,38 +160,44 @@ function parseScenarios(data) {
       }
     }
   }
-  
+
   // Normalize field names to handle variations
   return scenarios.map((scenario, index) => {
     const normalized = { ...scenario };
-    
+
     // Normalize title - check capitalized and lowercase variations
     normalized.title = scenario.Title || scenario.title || scenario.name || '';
-    
+
     // Normalize character ID field names - check all variations including capitalized
-    normalized.characterId = scenario.CharacterID || scenario.characterId || scenario.characterID || 
-                             scenario.character_id || scenario.character || scenario.characterName || '';
-    
-    // Normalize environment field names - check capitalized and lowercase variations
-    normalized.environment = scenario.Environment || scenario.environment || scenario.env || '';
-    
+    normalized.characterId = scenario.CharacterID || scenario.characterId || scenario.characterID ||
+      scenario.character_id || scenario.character || scenario.characterName || '';
+
+    // Normalize character name field
+    normalized.characterName = scenario.CharacterName || scenario.characterName || '';
+
+    // Normalize environment ID field
+    normalized.environmentId = scenario.environmentId || scenario.EnvironmentId || scenario.EnvironmentID || '';
+
+    // Normalize environment name field - check variations including old 'Environment' field for backwards compatibility
+    normalized.environmentName = scenario.EnvironmentName || scenario.environmentName || scenario.Environment || scenario.environment || scenario.env || '';
+
     // Normalize greeting field names - check capitalized and lowercase variations
     normalized.greeting = scenario.Greeting || scenario.greeting || scenario.greetingMessage || '';
-    
+
     // Normalize column/row/buttonIndex field names - check capitalized versions first
-    normalized.column = scenario.Column !== undefined ? scenario.Column : 
-                       (scenario.column !== undefined ? scenario.column : undefined);
-    normalized.row = scenario.Row !== undefined ? scenario.Row : 
-                    (scenario.row !== undefined ? scenario.row : undefined);
-    normalized.buttonIndex = scenario.ButtonIndex !== undefined ? scenario.ButtonIndex : 
-                            (scenario.buttonIndex !== undefined ? scenario.buttonIndex : 
-                            (scenario.button_index !== undefined ? scenario.button_index : undefined));
-    
+    normalized.column = scenario.Column !== undefined ? scenario.Column :
+      (scenario.column !== undefined ? scenario.column : undefined);
+    normalized.row = scenario.Row !== undefined ? scenario.Row :
+      (scenario.row !== undefined ? scenario.row : undefined);
+    normalized.buttonIndex = scenario.ButtonIndex !== undefined ? scenario.ButtonIndex :
+      (scenario.buttonIndex !== undefined ? scenario.buttonIndex :
+        (scenario.button_index !== undefined ? scenario.button_index : undefined));
+
     // Ensure ID exists
     if (!normalized.id) {
       normalized.id = scenario.ID || scenario.Id || `scenario-${index}`;
     }
-    
+
     return normalized;
   });
 }
@@ -246,7 +219,7 @@ function buildJsonStructure(scenarios) {
       return scenarios;
     }
   }
-  
+
   // Default: use 'scenarios' property
   return { scenarios };
 }
@@ -258,10 +231,10 @@ function buildJsonStructure(scenarios) {
  */
 function checkMissingFields(scenarios) {
   const scenariosWithMissingFields = [];
-  
+
   scenarios.forEach((scenario, index) => {
     const missingFields = [];
-    
+
     // Check for required fields using normalized field names
     // parseScenarios() normalizes fields, so we check the normalized names
     // Check if title exists and is not empty
@@ -269,25 +242,27 @@ function checkMissingFields(scenarios) {
     if (!title || (typeof title === 'string' && title.trim() === '')) {
       missingFields.push('Title');
     }
-    
+
     // After normalization, characterId should be set - check if exists and not empty
     const characterId = scenario.characterId;
     if (!characterId || (typeof characterId === 'string' && characterId.trim() === '')) {
       missingFields.push('Character ID');
     }
-    
-    // After normalization, environment should be set - check if exists and not empty
-    const environment = scenario.environment;
-    if (!environment || (typeof environment === 'string' && environment.trim() === '')) {
-      missingFields.push('Environment');
+
+    // Note: CharacterName and environmentId are optional new fields - don't warn if missing
+
+    // After normalization, environmentName should be set - check if exists and not empty
+    const environmentName = scenario.environmentName;
+    if (!environmentName || (typeof environmentName === 'string' && environmentName.trim() === '')) {
+      missingFields.push('Environment Name');
     }
-    
+
     // After normalization, greeting should be set - check if exists and not empty
     const greeting = scenario.greeting;
     if (!greeting || (typeof greeting === 'string' && greeting.trim() === '')) {
       missingFields.push('Greeting');
     }
-    
+
     if (missingFields.length > 0) {
       scenariosWithMissingFields.push({
         index,
@@ -296,7 +271,7 @@ function checkMissingFields(scenarios) {
       });
     }
   });
-  
+
   return scenariosWithMissingFields;
 }
 
@@ -308,26 +283,26 @@ function checkMissingFields(scenarios) {
 function calculateGridDimensions(scenarios) {
   let maxRow = -1;
   let maxCol = -1;
-  
+
   scenarios.forEach(scenario => {
     const row = scenario.row !== undefined ? scenario.row : 0;
     const col = scenario.column !== undefined ? scenario.column : 0;
     if (row > maxRow) maxRow = row;
     if (col > maxCol) maxCol = col;
   });
-  
+
   // Ensure at least 1 row and 1 column
   maxRow = Math.max(maxRow, 0);
   maxCol = Math.max(maxCol, 0);
-  
+
   // Use the maximum of calculated columns, minimum columns, and gridColumns
   const calculatedCols = Math.max(maxCol + 1, minGridCols);
   const actualColumns = Math.max(calculatedCols, gridColumns);
-  
+
   // Calculate total slots needed
   const calculatedSlots = (maxRow + 1) * actualColumns;
   const totalSlots = Math.max(scenarios.length, calculatedSlots);
-  
+
   return { maxRow, maxCol, totalSlots, actualColumns };
 }
 
@@ -372,9 +347,9 @@ function renderScenarios() {
     scenariosGrid.innerHTML = '<div class="empty-state"><h3>No data loaded</h3><p>Click "Reload JSON" to fetch scenarios</p></div>';
     return;
   }
-  
+
   const scenarios = parseScenarios(currentJsonData);
-  
+
   // Check for missing fields and prompt user
   const scenariosWithMissingFields = checkMissingFields(scenarios);
   if (scenariosWithMissingFields.length > 0) {
@@ -382,33 +357,34 @@ function renderScenarios() {
     const fieldsList = [...new Set(scenariosWithMissingFields.flatMap(s => s.missingFields))].join(', ');
     showStatus(`⚠️ ${missingCount} scenario(s) have missing required fields (${fieldsList}). Please edit them to fill in the missing information.`, 'error');
   }
-  
+
   // Calculate grid dimensions
   const { maxRow, totalSlots, actualColumns } = calculateGridDimensions(scenarios);
   // Use minimum rows if it's greater than calculated rows
   const calculatedRows = Math.max(maxRow + 1, Math.ceil(totalSlots / actualColumns));
   const totalRows = Math.max(calculatedRows, minGridRows);
   const totalCols = Math.max(actualColumns, minGridCols);
-  
+
   // Update grid columns for CSS
   scenariosGrid.style.gridTemplateColumns = `repeat(${totalCols}, 1fr)`;
-  
+
   // Create grid slots
   let gridHTML = '';
   for (let row = 0; row < totalRows; row++) {
     for (let col = 0; col < totalCols; col++) {
       const scenario = getScenarioAtPosition(scenarios, col, row);
       const slotIndex = row * totalCols + col;
-      
+
       if (scenario) {
         // Slot with scenario card
         // Use grid position to identify scenario uniquely instead of array index
         const title = scenario.title || scenario.name || 'Untitled Scenario';
         const characterId = scenario.characterId || 'Unknown';
-        const environmentValue = scenario.environment || '';
-        const environment = getEnvironmentDisplayName(environmentValue);
+        const characterName = scenario.characterName || '';
+        const environmentId = scenario.environmentId || '';
+        const environmentName = scenario.environmentName || '';
         const greeting = scenario.greeting || '';
-        
+
         gridHTML += `
           <div class="grid-slot" data-column="${col}" data-row="${row}" data-slot-index="${slotIndex}" 
                ondragover="event.preventDefault(); handleDragOver(event)" 
@@ -430,7 +406,8 @@ function renderScenarios() {
               </div>
               <div class="scenario-card-body">
                 <p class="scenario-card-info"><strong>Character ID:</strong> ${escapeHtml(characterId)}</p>
-                <p class="scenario-card-info"><strong>Environment:</strong> ${escapeHtml(environment)}</p>
+                <p class="scenario-card-info"><strong>Character Name:</strong> ${escapeHtml(characterName) || '<em>Not set</em>'}</p>
+                <p class="scenario-card-info"><strong>Environment:</strong> ${escapeHtml(environmentName) || '<em>Not set</em>'}</p>
                 ${greeting ? `<p class="scenario-card-info"><strong>Greeting:</strong> ${escapeHtml(greeting)}</p>` : '<p class="scenario-card-info"><em>No greeting set</em></p>'}
               </div>
             </div>
@@ -453,9 +430,9 @@ function renderScenarios() {
       }
     }
   }
-  
+
   scenariosGrid.innerHTML = gridHTML;
-  
+
   if (scenarios.length === 0 && totalSlots === 0) {
     scenariosGrid.innerHTML = '<div class="empty-state"><h3>No scenarios found</h3><p>Click "Add Scenario" to create your first scenario</p></div>';
   }
@@ -498,36 +475,43 @@ function toggleViewMode() {
 function openScenarioModal(column = null, row = null) {
   editingScenarioColumn = column;
   editingScenarioRow = row;
-  
+
   if (column !== null && row !== null) {
     // Edit mode
     const scenarios = parseScenarios(currentJsonData);
     const scenario = getScenarioAtPosition(scenarios, column, row);
     modalTitle.textContent = 'Edit Scenario';
-    
+
     // Populate form fields - use normalized fields (parseScenarios already normalized them)
     document.getElementById('scenarioTitle').value = scenario.title || scenario.name || '';
-    
+
     // Character ID - use normalized field
     const characterId = scenario.characterId || '';
     document.getElementById('scenarioCharacterId').value = characterId;
-    
-    // Environment - convert value to display name for dropdown
-    const environmentValue = scenario.environment || '';
-    const environmentDisplay = getEnvironmentDisplayName(environmentValue);
-    document.getElementById('scenarioEnvironment').value = environmentDisplay;
-    
+
+    // Character Name - use normalized field
+    const characterName = scenario.characterName || '';
+    document.getElementById('scenarioCharacterName').value = characterName;
+
+    // Environment ID - use normalized field
+    const environmentId = scenario.environmentId || '';
+    document.getElementById('scenarioEnvironmentId').value = environmentId;
+
+    // Environment Name - use normalized field
+    const environmentName = scenario.environmentName || '';
+    document.getElementById('scenarioEnvironmentName').value = environmentName;
+
     // Greeting - use normalized field
     const greeting = scenario.greeting || '';
     document.getElementById('scenarioGreeting').value = greeting;
-    
-    // Check for missing required fields and show warning
+
+    // Check for missing required fields and show warning (CharacterName and environmentId are optional)
     const missingFields = [];
     if (!scenario.title && !scenario.name) missingFields.push('Title');
     if (!characterId) missingFields.push('Character ID');
-    if (!environmentValue) missingFields.push('Environment');
+    if (!environmentName) missingFields.push('Environment Name');
     if (!greeting) missingFields.push('Greeting');
-    
+
     if (missingFields.length > 0) {
       showStatus(`⚠️ Missing required fields: ${missingFields.join(', ')}. Please fill them in.`, 'error');
     }
@@ -536,7 +520,7 @@ function openScenarioModal(column = null, row = null) {
     modalTitle.textContent = 'Add Scenario';
     scenarioForm.reset();
   }
-  
+
   scenarioModal.classList.remove('hidden');
 }
 
@@ -557,36 +541,35 @@ function closeScenarioModal() {
 function saveScenario() {
   const title = document.getElementById('scenarioTitle').value.trim();
   const characterId = document.getElementById('scenarioCharacterId').value.trim();
-  const environmentDisplay = document.getElementById('scenarioEnvironment').value.trim();
+  const characterName = document.getElementById('scenarioCharacterName').value.trim();
+  const environmentId = document.getElementById('scenarioEnvironmentId').value.trim();
+  const environmentName = document.getElementById('scenarioEnvironmentName').value.trim();
   const greeting = document.getElementById('scenarioGreeting').value.trim();
-  
-  // Validation
-  if (!title || !characterId || !environmentDisplay || !greeting) {
-    showStatus('⚠️ Please fill in all required fields (Title, Character ID, Environment, Greeting)', 'error');
+
+  // Validation - only require essential fields (CharacterName and environmentId are optional)
+  if (!title || !characterId || !environmentName || !greeting) {
+    showStatus('⚠️ Please fill in all required fields (Title, Character ID, Environment Name, Greeting)', 'error');
     return;
   }
-  
-  // Convert environment display name to value
-  const environment = getEnvironmentValue(environmentDisplay);
-  
+
   // Get original scenarios (before normalization) to preserve field names
   // We need to work with the original structure, not the normalized one
   // Create a deep clone to avoid modifying the original
   let originalScenarios = [];
   let isArrayStructure = false;
-  
+
   if (Array.isArray(currentJsonData)) {
     originalScenarios = deepClone(currentJsonData); // Deep copy to avoid reference issues
     isArrayStructure = true;
   } else if (currentJsonData && currentJsonData.scenarios) {
     originalScenarios = deepClone(currentJsonData.scenarios); // Deep copy
   }
-  
+
   // Clean up any normalized fields that might have been added during parsing
   originalScenarios = originalScenarios.map(scenario => {
     // Check if this scenario uses capitalized fields
     const useCapitalized = scenario.Title !== undefined || scenario.CharacterID !== undefined;
-    
+
     if (useCapitalized) {
       // Only keep capitalized fields - remove any lowercase normalized fields
       const clean = {};
@@ -594,8 +577,12 @@ function saveScenario() {
       if (scenario.Row !== undefined) clean.Row = scenario.Row;
       if (scenario.Title !== undefined) clean.Title = scenario.Title;
       if (scenario.CharacterID !== undefined) clean.CharacterID = scenario.CharacterID;
+      if (scenario.CharacterName !== undefined) clean.CharacterName = scenario.CharacterName;
       if (scenario.ButtonIndex !== undefined) clean.ButtonIndex = scenario.ButtonIndex;
-      if (scenario.Environment !== undefined) clean.Environment = scenario.Environment;
+      if (scenario.environmentId !== undefined) clean.environmentId = scenario.environmentId;
+      if (scenario.EnvironmentName !== undefined) clean.EnvironmentName = scenario.EnvironmentName;
+      // Backwards compatibility: also check old Environment field
+      if (scenario.Environment !== undefined && !scenario.EnvironmentName) clean.EnvironmentName = scenario.Environment;
       if (scenario.Greeting !== undefined) clean.Greeting = scenario.Greeting;
       return clean;
     } else {
@@ -605,25 +592,28 @@ function saveScenario() {
         // Skip normalized fields that might have been added (only if they're duplicates)
         // Keep original lowercase fields
         if (!(key === 'title' && scenario.Title) &&
-            !(key === 'characterId' && scenario.CharacterID) &&
-            !(key === 'environment' && scenario.Environment) &&
-            !(key === 'greeting' && scenario.Greeting) &&
-            !(key === 'column' && scenario.Column !== undefined) &&
-            !(key === 'row' && scenario.Row !== undefined) &&
-            !(key === 'buttonIndex' && scenario.ButtonIndex !== undefined)) {
+          !(key === 'characterId' && scenario.CharacterID) &&
+          !(key === 'characterName' && scenario.CharacterName) &&
+          !(key === 'environmentId' && scenario.EnvironmentId) &&
+          !(key === 'environmentName' && scenario.EnvironmentName) &&
+          !(key === 'environment' && (scenario.Environment || scenario.EnvironmentName)) &&
+          !(key === 'greeting' && scenario.Greeting) &&
+          !(key === 'column' && scenario.Column !== undefined) &&
+          !(key === 'row' && scenario.Row !== undefined) &&
+          !(key === 'buttonIndex' && scenario.ButtonIndex !== undefined)) {
           clean[key] = scenario[key];
         }
       });
       return clean;
     }
   });
-  
+
   if (editingScenarioColumn !== null && editingScenarioRow !== null) {
     // Update existing scenario - preserve original field name capitalization
     // Find the original scenario by grid position
-    const hasCapitalizedFields = originalScenarios.length > 0 && 
-                          (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
-    
+    const hasCapitalizedFields = originalScenarios.length > 0 &&
+      (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
+
     let originalScenario = null;
     let originalIndex = -1;
     if (hasCapitalizedFields) {
@@ -639,17 +629,17 @@ function saveScenario() {
         return sCol === editingScenarioColumn && sRow === editingScenarioRow;
       });
     }
-    
+
     if (originalIndex === -1) {
       showStatus('❌ Error: Scenario not found', 'error');
       return;
     }
-    
+
     originalScenario = originalScenarios[originalIndex];
-    
+
     // Determine which field names to use (preserve original capitalization if it exists)
     const useCapitalized = originalScenario.Title !== undefined || originalScenario.CharacterID !== undefined;
-    
+
     if (useCapitalized) {
       // Update using capitalized field names - create new object without normalized fields
       const updatedScenario = {
@@ -657,41 +647,47 @@ function saveScenario() {
         Row: originalScenario.Row !== undefined ? originalScenario.Row : 0,
         Title: title,
         CharacterID: characterId,
+        CharacterName: characterName,
         ButtonIndex: originalScenario.ButtonIndex !== undefined ? originalScenario.ButtonIndex : 0,
-        Environment: environment,
+        environmentId: environmentId,
+        EnvironmentName: environmentName,
         Greeting: greeting
       };
-      originalScenarios[editingScenarioIndex] = updatedScenario;
+      originalScenarios[originalIndex] = updatedScenario;
     } else {
       // Use lowercase field names
       const updatedScenario = {
         ...originalScenario,
         title,
         characterId,
-        environment,
+        characterName,
+        environmentId,
+        environmentName,
         greeting
       };
       // Preserve column/row/buttonIndex if they exist
       if (originalScenario.column !== undefined) updatedScenario.column = originalScenario.column;
       if (originalScenario.row !== undefined) updatedScenario.row = originalScenario.row;
       if (originalScenario.buttonIndex !== undefined) updatedScenario.buttonIndex = originalScenario.buttonIndex;
-      originalScenarios[editingScenarioIndex] = updatedScenario;
+      // Remove old environment field if it exists
+      delete updatedScenario.environment;
+      originalScenarios[originalIndex] = updatedScenario;
     }
   } else {
     // Add new scenario - find first empty slot or add new row
-    const useCapitalized = originalScenarios.length > 0 && 
-                          (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
-    
+    const useCapitalized = originalScenarios.length > 0 &&
+      (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
+
     // Get current grid dimensions
     const normalizedScenarios = parseScenarios(currentJsonData);
     const { maxRow, actualColumns } = calculateGridDimensions(normalizedScenarios);
     const totalCols = Math.max(actualColumns, minGridCols);
     const totalRows = Math.max(maxRow + 1, minGridRows);
-    
+
     // Find first empty slot
     let emptySlot = findFirstEmptySlot(normalizedScenarios, totalRows, totalCols);
     let targetColumn, targetRow;
-    
+
     if (emptySlot) {
       // Use the first empty slot found
       targetColumn = emptySlot.column;
@@ -702,18 +698,20 @@ function saveScenario() {
       targetColumn = 0;
       minGridRows = totalRows + 1;
     }
-    
+
     // Calculate ButtonIndex
     const buttonIndex = targetRow * totalCols + targetColumn;
-    
+
     if (useCapitalized) {
       originalScenarios.push({
         Column: targetColumn,
         Row: targetRow,
         Title: title,
         CharacterID: characterId,
+        CharacterName: characterName,
         ButtonIndex: buttonIndex,
-        Environment: environment,
+        environmentId: environmentId,
+        EnvironmentName: environmentName,
         Greeting: greeting
       });
     } else {
@@ -721,7 +719,9 @@ function saveScenario() {
         id: `scenario-${Date.now()}`,
         title,
         characterId,
-        environment,
+        characterName,
+        environmentId,
+        environmentName,
         greeting,
         column: targetColumn,
         row: targetRow,
@@ -729,14 +729,14 @@ function saveScenario() {
       });
     }
   }
-  
+
   // Rebuild JSON structure using original scenarios (not normalized)
   const newJsonData = isArrayStructure ? originalScenarios : { scenarios: originalScenarios };
   currentJsonData = newJsonData;
-  
+
   // Update JSON textarea
   displayJson(newJsonData);
-  
+
   closeScenarioModal();
   showStatus(editingScenarioColumn !== null && editingScenarioRow !== null ? '✅ Scenario updated' : '✅ Scenario added');
 }
@@ -760,22 +760,22 @@ function duplicateScenario(column, row) {
     showStatus('⚠️ Please load JSON data first', 'error');
     return;
   }
-  
+
   // Get original scenarios to preserve structure
   let originalScenarios = [];
   let isArrayStructure = false;
-  
+
   if (Array.isArray(currentJsonData)) {
     originalScenarios = deepClone(currentJsonData);
     isArrayStructure = true;
   } else if (currentJsonData && currentJsonData.scenarios) {
     originalScenarios = deepClone(currentJsonData.scenarios);
   }
-  
+
   // Find the original scenario by grid position
-  const useCapitalized = originalScenarios.length > 0 && 
-                        (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
-  
+  const useCapitalized = originalScenarios.length > 0 &&
+    (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
+
   let originalScenario = null;
   if (useCapitalized) {
     originalScenario = originalScenarios.find(s => {
@@ -790,22 +790,22 @@ function duplicateScenario(column, row) {
       return sCol === column && sRow === row;
     });
   }
-  
+
   if (!originalScenario) {
     showStatus('❌ Error: Scenario not found', 'error');
     return;
   }
-  
+
   // Get current grid dimensions
   const normalizedScenarios = parseScenarios(currentJsonData);
   const { maxRow, actualColumns } = calculateGridDimensions(normalizedScenarios);
   const totalCols = Math.max(actualColumns, minGridCols);
   const totalRows = Math.max(maxRow + 1, minGridRows);
-  
+
   // Find first empty slot
   let emptySlot = findFirstEmptySlot(normalizedScenarios, totalRows, totalCols);
   let targetColumn, targetRow;
-  
+
   if (emptySlot) {
     targetColumn = emptySlot.column;
     targetRow = emptySlot.row;
@@ -815,10 +815,10 @@ function duplicateScenario(column, row) {
     targetColumn = 0;
     minGridRows = totalRows + 1;
   }
-  
+
   // Calculate ButtonIndex
   const buttonIndex = targetRow * totalCols + targetColumn;
-  
+
   // Create duplicate scenario
   if (useCapitalized) {
     const duplicatedScenario = {
@@ -826,8 +826,10 @@ function duplicateScenario(column, row) {
       Row: targetRow,
       Title: originalScenario.Title || '',
       CharacterID: originalScenario.CharacterID || '',
+      CharacterName: originalScenario.CharacterName || '',
       ButtonIndex: buttonIndex,
-      Environment: originalScenario.Environment || '',
+      environmentId: originalScenario.environmentId || '',
+      EnvironmentName: originalScenario.EnvironmentName || originalScenario.Environment || '',
       Greeting: originalScenario.Greeting || ''
     };
     originalScenarios.push(duplicatedScenario);
@@ -836,7 +838,9 @@ function duplicateScenario(column, row) {
       id: `scenario-${Date.now()}`,
       title: originalScenario.title || originalScenario.name || '',
       characterId: originalScenario.characterId || originalScenario.characterID || originalScenario.character_id || originalScenario.character || '',
-      environment: originalScenario.environment || originalScenario.env || '',
+      characterName: originalScenario.characterName || '',
+      environmentId: originalScenario.environmentId || '',
+      environmentName: originalScenario.environmentName || originalScenario.environment || originalScenario.env || '',
       greeting: originalScenario.greeting || originalScenario.greetingMessage || '',
       column: targetColumn,
       row: targetRow,
@@ -844,7 +848,7 @@ function duplicateScenario(column, row) {
     };
     originalScenarios.push(duplicatedScenario);
   }
-  
+
   // Clean up normalized fields from all scenarios
   originalScenarios = originalScenarios.map(s => {
     const sUseCapitalized = s.Title !== undefined || s.CharacterID !== undefined;
@@ -854,8 +858,10 @@ function duplicateScenario(column, row) {
       if (s.Row !== undefined) clean.Row = s.Row;
       if (s.Title !== undefined) clean.Title = s.Title;
       if (s.CharacterID !== undefined) clean.CharacterID = s.CharacterID;
+      if (s.CharacterName !== undefined) clean.CharacterName = s.CharacterName;
       if (s.ButtonIndex !== undefined) clean.ButtonIndex = s.ButtonIndex;
-      if (s.Environment !== undefined) clean.Environment = s.Environment;
+      if (s.environmentId !== undefined) clean.environmentId = s.environmentId;
+      if (s.EnvironmentName !== undefined) clean.EnvironmentName = s.EnvironmentName;
       if (s.Greeting !== undefined) clean.Greeting = s.Greeting;
       return clean;
     } else {
@@ -863,7 +869,10 @@ function duplicateScenario(column, row) {
       // Remove normalized fields if they exist as duplicates
       if (clean.title && clean.Title) delete clean.title;
       if (clean.characterId && clean.CharacterID) delete clean.characterId;
-      if (clean.environment && clean.Environment) delete clean.environment;
+      if (clean.characterName && clean.CharacterName) delete clean.characterName;
+      if (clean.environmentId && clean.EnvironmentId) delete clean.environmentId;
+      if (clean.environmentName && clean.EnvironmentName) delete clean.environmentName;
+      if (clean.environment && (clean.Environment || clean.EnvironmentName)) delete clean.environment;
       if (clean.greeting && clean.Greeting) delete clean.greeting;
       if (clean.column !== undefined && clean.Column !== undefined) delete clean.column;
       if (clean.row !== undefined && clean.Row !== undefined) delete clean.row;
@@ -871,14 +880,14 @@ function duplicateScenario(column, row) {
       return clean;
     }
   });
-  
+
   // Rebuild JSON structure
   const newJsonData = isArrayStructure ? originalScenarios : { scenarios: originalScenarios };
   currentJsonData = newJsonData;
-  
+
   // Update JSON textarea
   displayJson(newJsonData);
-  
+
   showStatus('✅ Scenario duplicated successfully');
 }
 
@@ -891,22 +900,22 @@ function deleteScenario(column, row) {
   if (!confirm('Are you sure you want to delete this scenario?')) {
     return;
   }
-  
+
   // Get original scenarios to preserve structure
   let originalScenarios = [];
   let isArrayStructure = false;
-  
+
   if (Array.isArray(currentJsonData)) {
     originalScenarios = deepClone(currentJsonData);
     isArrayStructure = true;
   } else if (currentJsonData && currentJsonData.scenarios) {
     originalScenarios = deepClone(currentJsonData.scenarios);
   }
-  
+
   // Find the original scenario by grid position
-  const useCapitalized = originalScenarios.length > 0 && 
-                        (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
-  
+  const useCapitalized = originalScenarios.length > 0 &&
+    (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
+
   let originalIndex = -1;
   if (useCapitalized) {
     originalIndex = originalScenarios.findIndex(s => {
@@ -921,15 +930,15 @@ function deleteScenario(column, row) {
       return sCol === column && sRow === row;
     });
   }
-  
+
   if (originalIndex === -1) {
     showStatus('❌ Error: Scenario not found', 'error');
     return;
   }
-  
+
   // Remove the scenario
   originalScenarios.splice(originalIndex, 1);
-  
+
   // Clean up normalized fields from all remaining scenarios
   originalScenarios = originalScenarios.map(s => {
     const sUseCapitalized = s.Title !== undefined || s.CharacterID !== undefined;
@@ -939,8 +948,10 @@ function deleteScenario(column, row) {
       if (s.Row !== undefined) clean.Row = s.Row;
       if (s.Title !== undefined) clean.Title = s.Title;
       if (s.CharacterID !== undefined) clean.CharacterID = s.CharacterID;
+      if (s.CharacterName !== undefined) clean.CharacterName = s.CharacterName;
       if (s.ButtonIndex !== undefined) clean.ButtonIndex = s.ButtonIndex;
-      if (s.Environment !== undefined) clean.Environment = s.Environment;
+      if (s.environmentId !== undefined) clean.environmentId = s.environmentId;
+      if (s.EnvironmentName !== undefined) clean.EnvironmentName = s.EnvironmentName;
       if (s.Greeting !== undefined) clean.Greeting = s.Greeting;
       return clean;
     } else {
@@ -949,7 +960,10 @@ function deleteScenario(column, row) {
       // Remove normalized fields if they exist as duplicates
       if (clean.title && clean.Title) delete clean.title;
       if (clean.characterId && clean.CharacterID) delete clean.characterId;
-      if (clean.environment && clean.Environment) delete clean.environment;
+      if (clean.characterName && clean.CharacterName) delete clean.characterName;
+      if (clean.environmentId && clean.EnvironmentId) delete clean.environmentId;
+      if (clean.environmentName && clean.EnvironmentName) delete clean.environmentName;
+      if (clean.environment && (clean.Environment || clean.EnvironmentName)) delete clean.environment;
       if (clean.greeting && clean.Greeting) delete clean.greeting;
       if (clean.column !== undefined && clean.Column !== undefined) delete clean.column;
       if (clean.row !== undefined && clean.Row !== undefined) delete clean.row;
@@ -957,14 +971,14 @@ function deleteScenario(column, row) {
       return clean;
     }
   });
-  
+
   // Rebuild JSON structure
   const newJsonData = isArrayStructure ? originalScenarios : { scenarios: originalScenarios };
   currentJsonData = newJsonData;
-  
+
   // Update JSON textarea
   displayJson(newJsonData);
-  
+
   showStatus('✅ Scenario deleted');
 }
 
@@ -1026,29 +1040,29 @@ function handleDragLeave(event) {
 function handleDrop(event, targetColumn, targetRow) {
   event.preventDefault();
   event.stopPropagation();
-  
+
   if (draggedCardColumn === null || draggedCardRow === null) return;
-  
+
   const scenarios = parseScenarios(currentJsonData);
   const scenario = getScenarioAtPosition(scenarios, draggedCardColumn, draggedCardRow);
-  
+
   if (!scenario) return;
-  
+
   // Get original scenarios to preserve structure
   let originalScenarios = [];
   let isArrayStructure = false;
-  
+
   if (Array.isArray(currentJsonData)) {
     originalScenarios = deepClone(currentJsonData);
     isArrayStructure = true;
   } else if (currentJsonData && currentJsonData.scenarios) {
     originalScenarios = deepClone(currentJsonData.scenarios);
   }
-  
+
   // Find the original scenario by grid position
-  const hasCapitalizedFields = originalScenarios.length > 0 && 
-                        (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
-  
+  const hasCapitalizedFields = originalScenarios.length > 0 &&
+    (originalScenarios[0].Title !== undefined || originalScenarios[0].CharacterID !== undefined);
+
   let originalScenario = null;
   if (hasCapitalizedFields) {
     originalScenario = originalScenarios.find(s => {
@@ -1063,35 +1077,35 @@ function handleDrop(event, targetColumn, targetRow) {
       return sCol === draggedCardColumn && sRow === draggedCardRow;
     });
   }
-  
+
   if (!originalScenario) return;
-  
+
   // Determine field name style
   const useCapitalized = originalScenario.Title !== undefined || originalScenario.CharacterID !== undefined;
-  
+
   // Get current grid dimensions
   const { actualColumns } = calculateGridDimensions(parseScenarios(currentJsonData));
   const totalCols = Math.max(actualColumns, minGridCols);
-  
+
   // Check if target slot has a scenario (swap scenario positions)
   const targetScenario = originalScenarios.find(s => {
     const sCol = useCapitalized ? (s.Column !== undefined ? s.Column : 0) : (s.column !== undefined ? s.column : 0);
     const sRow = useCapitalized ? (s.Row !== undefined ? s.Row : 0) : (s.row !== undefined ? s.row : 0);
     return sCol === targetColumn && sRow === targetRow;
   });
-  
+
   // Get original position
   const originalCol = useCapitalized ? (originalScenario.Column !== undefined ? originalScenario.Column : 0) : (originalScenario.column !== undefined ? originalScenario.column : 0);
   const originalRow = useCapitalized ? (originalScenario.Row !== undefined ? originalScenario.Row : 0) : (originalScenario.row !== undefined ? originalScenario.row : 0);
-  
+
   // Update dragged scenario position
   const targetSlotIndex = targetRow * totalCols + targetColumn;
-  
+
   if (useCapitalized) {
     originalScenario.Column = targetColumn;
     originalScenario.Row = targetRow;
     originalScenario.ButtonIndex = targetSlotIndex;
-    
+
     // If swapping, update the other scenario's position
     if (targetScenario && targetScenario !== originalScenario) {
       targetScenario.Column = originalCol;
@@ -1102,7 +1116,7 @@ function handleDrop(event, targetColumn, targetRow) {
     originalScenario.column = targetColumn;
     originalScenario.row = targetRow;
     originalScenario.buttonIndex = targetSlotIndex;
-    
+
     // If swapping, update the other scenario's position
     if (targetScenario && targetScenario !== originalScenario) {
       targetScenario.column = originalCol;
@@ -1110,7 +1124,7 @@ function handleDrop(event, targetColumn, targetRow) {
       targetScenario.buttonIndex = originalRow * totalCols + originalCol;
     }
   }
-  
+
   // Clean up normalized fields from all scenarios
   originalScenarios = originalScenarios.map(s => {
     const sUseCapitalized = s.Title !== undefined || s.CharacterID !== undefined;
@@ -1127,15 +1141,15 @@ function handleDrop(event, targetColumn, targetRow) {
     }
     return s;
   });
-  
+
   // Rebuild JSON structure
   const newJsonData = isArrayStructure ? originalScenarios : { scenarios: originalScenarios };
   currentJsonData = newJsonData;
-  
+
   // Re-render
   renderScenarios();
   displayJson(newJsonData);
-  
+
   showStatus('✅ Scenario moved successfully');
 }
 
@@ -1179,10 +1193,10 @@ function addRow() {
     showStatus('⚠️ Please load JSON data first', 'error');
     return;
   }
-  
+
   const scenarios = parseScenarios(currentJsonData);
   const { maxRow, maxCol, actualColumns } = calculateGridDimensions(scenarios);
-  
+
   // If no scenarios exist, allow adding the first row
   if (scenarios.length === 0) {
     minGridRows = 1;
@@ -1190,18 +1204,18 @@ function addRow() {
     showStatus('✅ New row added');
     return;
   }
-  
+
   // Check if the previous row (last row) has scenarios
   const lastRow = Math.max(maxRow, minGridRows - 1);
   if (lastRow >= 0 && !rowHasScenarios(scenarios, lastRow, maxCol)) {
     showStatus('⚠️ Cannot add a new row. The previous row must have at least one scenario.', 'error');
     return;
   }
-  
+
   // Increment minimum rows to add a new row of empty slots
   const currentRows = Math.max(maxRow + 1, minGridRows);
   minGridRows = currentRows + 1;
-  
+
   // Re-render to show the new empty slots
   renderScenarios();
   showStatus('✅ New row added');
@@ -1215,10 +1229,10 @@ function addColumn() {
     showStatus('⚠️ Please load JSON data first', 'error');
     return;
   }
-  
+
   const scenarios = parseScenarios(currentJsonData);
   const { maxRow, maxCol, actualColumns } = calculateGridDimensions(scenarios);
-  
+
   // If no scenarios exist, allow adding the first column (beyond default 2)
   if (scenarios.length === 0 && minGridCols <= 2) {
     minGridCols = 3;
@@ -1227,19 +1241,19 @@ function addColumn() {
     showStatus('✅ New column added');
     return;
   }
-  
+
   // Check if the previous column (last column) has scenarios
   const lastCol = Math.max(maxCol, minGridCols - 1);
   if (lastCol >= 0 && !columnHasScenarios(scenarios, lastCol, maxRow)) {
     showStatus('⚠️ Cannot add a new column. The previous column must have at least one scenario.', 'error');
     return;
   }
-  
+
   // Increment minimum columns to add a new column of empty slots
   const currentCols = Math.max(maxCol + 1, minGridCols);
   minGridCols = currentCols + 1;
   gridColumns = Math.max(gridColumns, minGridCols);
-  
+
   // Re-render to show the new empty slots
   renderScenarios();
   showStatus('✅ New column added');
@@ -1251,20 +1265,20 @@ function addColumn() {
 function removeEmptySlot(column, row) {
   const scenarios = parseScenarios(currentJsonData);
   const scenarioAtPosition = getScenarioAtPosition(scenarios, column, row);
-  
+
   if (scenarioAtPosition) {
     showStatus('⚠️ Cannot remove slot with a scenario. Delete the scenario first.', 'error');
     return;
   }
-  
+
   // Check if this is the last row and we can reduce minGridRows
   const { maxRow, maxCol, actualColumns } = calculateGridDimensions(scenarios);
   const totalCols = Math.max(actualColumns, minGridCols);
   const currentRows = Math.max(maxRow + 1, minGridRows);
-  
+
   // Calculate the actual number of columns that have data (maxCol + 1)
   const dataColumns = maxCol + 1;
-  
+
   // If removing from the last row and it's empty, reduce minGridRows
   if (row === currentRows - 1) {
     // Check if the entire last row is empty
@@ -1275,12 +1289,12 @@ function removeEmptySlot(column, row) {
         break;
       }
     }
-    
+
     if (lastRowEmpty && minGridRows > 0) {
       minGridRows = Math.max(0, minGridRows - 1);
     }
   }
-  
+
   // Check if this is the last column and we can reduce minGridCols
   // The last column is the one at index (totalCols - 1)
   // We can reduce if: column is the last one AND it's beyond the data columns (meaning it's an extra column)
@@ -1304,13 +1318,13 @@ function removeEmptySlot(column, row) {
         }
       }
     }
-    
+
     if (lastColEmpty && minGridCols > 2) {
       minGridCols = Math.max(2, minGridCols - 1);
       gridColumns = Math.max(2, gridColumns);
     }
   }
-  
+
   // Re-render
   renderScenarios();
   showStatus('✅ Empty slot removed');
@@ -1326,9 +1340,9 @@ function refreshGridInternal() {
     gridColumns = 2;
     return;
   }
-  
+
   const scenarios = parseScenarios(currentJsonData);
-  
+
   if (scenarios.length === 0) {
     // No scenarios, reset to default
     minGridRows = 0;
@@ -1336,18 +1350,18 @@ function refreshGridInternal() {
     gridColumns = 2;
     return;
   }
-  
+
   // Find the actual maximum row and column that have scenarios
   let maxRowWithData = -1;
   let maxColWithData = -1;
-  
+
   scenarios.forEach(scenario => {
     const row = scenario.row !== undefined ? scenario.row : 0;
     const col = scenario.column !== undefined ? scenario.column : 0;
     if (row > maxRowWithData) maxRowWithData = row;
     if (col > maxColWithData) maxColWithData = col;
   });
-  
+
   // Reset minGridRows and minGridCols to match actual data
   // Add 1 because rows/columns are 0-indexed
   minGridRows = maxRowWithData + 1;
@@ -1363,9 +1377,9 @@ function refreshGrid() {
     showStatus('⚠️ Please load JSON data first', 'error');
     return;
   }
-  
+
   refreshGridInternal();
-  
+
   // Re-render
   renderScenarios();
   showStatus('✅ Grid refreshed - empty rows and columns removed');
@@ -1393,9 +1407,9 @@ async function handleFetchJson() {
   try {
     reloadBtn.disabled = true;
     reloadBtn.textContent = 'Loading...';
-    
+
     const result = await window.electronAPI.fetchJson();
-    
+
     if (result.success) {
       // Handle JSONBin response structure (may have 'record' property)
       const data = result.data.record || result.data;
@@ -1417,12 +1431,12 @@ async function handleFetchJson() {
  */
 async function handleUploadJson() {
   const jsonString = jsonTextArea.value.trim();
-  
+
   if (!jsonString) {
     showStatus('⚠️ Please paste or load JSON first.', 'error');
     return;
   }
-  
+
   // Validate JSON before uploading
   try {
     JSON.parse(jsonString);
@@ -1430,13 +1444,13 @@ async function handleUploadJson() {
     showStatus(`❌ Invalid JSON: ${error.message}`, 'error');
     return;
   }
-  
+
   try {
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'Uploading...';
-    
+
     const result = await window.electronAPI.uploadJson(jsonString);
-    
+
     if (result.success) {
       showStatus('✅ JSONBin updated successfully');
     } else {
@@ -1457,14 +1471,14 @@ async function handleLoadFromFile() {
   try {
     loadFileBtn.disabled = true;
     loadFileBtn.textContent = 'Loading...';
-    
+
     const result = await window.electronAPI.loadFromFile();
-    
+
     if (result.canceled) {
       // User canceled file dialog
       return;
     }
-    
+
     if (result.success) {
       // Handle JSONBin response structure if present
       const data = result.data.record || result.data;
@@ -1486,12 +1500,12 @@ async function handleLoadFromFile() {
  */
 async function handleSaveToFile() {
   const jsonString = jsonTextArea.value.trim();
-  
+
   if (!jsonString) {
     showStatus('⚠️ Please paste or load JSON first.', 'error');
     return;
   }
-  
+
   // Validate JSON before saving
   try {
     JSON.parse(jsonString);
@@ -1499,18 +1513,18 @@ async function handleSaveToFile() {
     showStatus(`❌ Invalid JSON: ${error.message}`, 'error');
     return;
   }
-  
+
   try {
     saveFileBtn.disabled = true;
     saveFileBtn.textContent = 'Saving...';
-    
+
     const result = await window.electronAPI.saveToFile(jsonString);
-    
+
     if (result.canceled) {
       // User canceled file dialog
       return;
     }
-    
+
     if (result.success) {
       showStatus(`✅ File saved successfully`);
     } else {
@@ -1530,10 +1544,10 @@ async function handleSaveToFile() {
 async function handleCheckForUpdates() {
   checkUpdatesBtn.disabled = true;
   checkUpdatesBtn.textContent = 'Checking...';
-  
+
   try {
     const result = await window.electronAPI.checkForUpdates();
-    
+
     if (result.success) {
       if (result.updateInfo.hasUpdate) {
         showUpdateModal(result.updateInfo);
@@ -1692,24 +1706,24 @@ function closeSettingsModal() {
  */
 async function handleSaveSettings(e) {
   e.preventDefault();
-  
+
   if (!environmentSelect || !environmentSelect.value) {
     showStatus('⚠️ Please select an environment', 'error');
     return;
   }
-  
+
   try {
     saveSettingsBtn.disabled = true;
     saveSettingsBtn.textContent = 'Saving...';
-    
+
     const selectedEnv = environmentSelect.value;
     const result = await window.electronAPI.setCurrentEnvironment(selectedEnv);
-    
+
     if (result.success) {
       updateEnvironmentIndicator(result.environment, result.name);
       closeSettingsModal();
       showStatus(`✅ Switched to ${result.name} environment. Reloading data...`, 'success');
-      
+
       // Reload JSON data from the new environment
       setTimeout(() => {
         handleFetchJson();
@@ -1771,11 +1785,11 @@ let currentUpdateInfo = null;
  */
 function markdownToHtml(markdown) {
   if (!markdown) return '';
-  
+
   // Store code blocks temporarily to avoid processing them as markdown
   const codeBlockPlaceholders = [];
   let placeholderIndex = 0;
-  
+
   // Replace code blocks with placeholders first
   let html = markdown.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
     const placeholder = `__CODE_BLOCK_${placeholderIndex}__`;
@@ -1786,17 +1800,17 @@ function markdownToHtml(markdown) {
     placeholderIndex++;
     return placeholder;
   });
-  
+
   // Process line by line
   const lines = html.split('\n');
   let inList = false;
   let inOrderedList = false;
   let result = [];
-  
+
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
     const trimmed = line.trim();
-    
+
     // Check if this is a code block placeholder
     const codeBlockMatch = line.match(/__CODE_BLOCK_(\d+)__/);
     if (codeBlockMatch) {
@@ -1809,14 +1823,14 @@ function markdownToHtml(markdown) {
         result.push('</ol>');
         inOrderedList = false;
       }
-      
+
       const index = parseInt(codeBlockMatch[1]);
       const codeBlock = codeBlockPlaceholders[index];
       const escaped = escapeHtml(codeBlock.code);
       result.push(`<pre class="markdown-code-block"><code class="language-${codeBlock.lang}">${escaped}</code></pre>`);
       continue;
     }
-    
+
     // Headers
     if (trimmed.startsWith('#### ')) {
       if (inList) { result.push('</ul>'); inList = false; }
@@ -1842,7 +1856,7 @@ function markdownToHtml(markdown) {
       result.push(`<h3 class="markdown-h3">${processInlineMarkdown(trimmed.substring(2))}</h3>`);
       continue;
     }
-    
+
     // Horizontal rules
     if (trimmed === '---' || trimmed === '***') {
       if (inList) { result.push('</ul>'); inList = false; }
@@ -1850,7 +1864,7 @@ function markdownToHtml(markdown) {
       result.push('<hr class="markdown-hr">');
       continue;
     }
-    
+
     // Blockquotes
     if (trimmed.startsWith('> ')) {
       if (inList) { result.push('</ul>'); inList = false; }
@@ -1858,7 +1872,7 @@ function markdownToHtml(markdown) {
       result.push(`<blockquote class="markdown-blockquote">${processInlineMarkdown(trimmed.substring(2))}</blockquote>`);
       continue;
     }
-    
+
     // Unordered list item
     if (/^[-*+] (.+)$/.test(trimmed)) {
       if (!inList) {
@@ -1873,7 +1887,7 @@ function markdownToHtml(markdown) {
       result.push(`<li class="markdown-list-item">${processInlineMarkdown(content)}</li>`);
       continue;
     }
-    
+
     // Ordered list item
     if (/^\d+\. (.+)$/.test(trimmed)) {
       if (!inOrderedList) {
@@ -1888,7 +1902,7 @@ function markdownToHtml(markdown) {
       result.push(`<li class="markdown-list-item">${processInlineMarkdown(content)}</li>`);
       continue;
     }
-    
+
     // Empty line - close lists
     if (!trimmed) {
       if (inList) {
@@ -1902,7 +1916,7 @@ function markdownToHtml(markdown) {
       result.push('');
       continue;
     }
-    
+
     // Regular line
     if (inList) {
       result.push('</ul>');
@@ -1912,20 +1926,20 @@ function markdownToHtml(markdown) {
       result.push('</ol>');
       inOrderedList = false;
     }
-    
+
     result.push(`<p class="markdown-paragraph">${processInlineMarkdown(trimmed)}</p>`);
   }
-  
+
   // Close any open lists
   if (inList) result.push('</ul>');
   if (inOrderedList) result.push('</ol>');
-  
+
   html = result.join('\n');
-  
+
   // Clean up empty paragraphs and excessive newlines
   html = html.replace(/<p class="markdown-paragraph"><\/p>/g, '');
   html = html.replace(/\n{3,}/g, '\n\n');
-  
+
   return html.trim();
 }
 
@@ -1935,9 +1949,9 @@ function markdownToHtml(markdown) {
 function processInlineMarkdown(text) {
   // Escape HTML first
   let html = escapeHtml(text);
-  
+
   // Process in order: code, links, bold, italic, strikethrough
-  
+
   // Inline code - protect from other processing
   const codePlaceholders = [];
   let codeIndex = 0;
@@ -1947,27 +1961,27 @@ function processInlineMarkdown(text) {
     codeIndex++;
     return placeholder;
   });
-  
+
   // Links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="markdown-link" target="_blank" rel="noopener noreferrer">$1</a>');
-  
+
   // Bold (**text** or __text__) - process before italic
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="markdown-bold">$1</strong>');
   html = html.replace(/__([^_]+)__/g, '<strong class="markdown-bold">$1</strong>');
-  
+
   // Italic (*text* or _text_) - only single asterisks/underscores not part of bold
   // Use a pattern that avoids matching when surrounded by same character
   html = html.replace(/(^|[^*])\*([^*]+)\*([^*]|$)/g, '$1<em class="markdown-italic">$2</em>$3');
   html = html.replace(/(^|[^_])_([^_]+)_([^_]|$)/g, '$1<em class="markdown-italic">$2</em>$3');
-  
+
   // Strikethrough
   html = html.replace(/~~([^~]+)~~/g, '<del class="markdown-strikethrough">$1</del>');
-  
+
   // Restore inline code
   for (let i = 0; i < codePlaceholders.length; i++) {
     html = html.replace(`__INLINE_CODE_${i}__`, `<code class="markdown-inline-code">${codePlaceholders[i]}</code>`);
   }
-  
+
   return html;
 }
 
@@ -1978,12 +1992,12 @@ function showUpdateModal(updateInfo) {
   currentUpdateInfo = updateInfo;
   currentVersionSpan.textContent = updateInfo.currentVersion;
   latestVersionSpan.textContent = updateInfo.latestVersion;
-  
+
   // Set initial status message
   if (updateStatusMessage) {
     updateStatusMessage.textContent = 'Update available for download';
   }
-  
+
   // Format release notes with GitHub-style markdown
   if (updateInfo.releaseNotes) {
     const formattedNotes = markdownToHtml(updateInfo.releaseNotes);
@@ -1991,7 +2005,7 @@ function showUpdateModal(updateInfo) {
   } else {
     updateReleaseNotes.innerHTML = '<p class="markdown-paragraph">No release notes available.</p>';
   }
-  
+
   // Reset UI state
   updateDownloadProgress.classList.add('hidden');
   updateDownloaded.classList.add('hidden');
@@ -2000,13 +2014,13 @@ function showUpdateModal(updateInfo) {
   downloadUpdateBtn.classList.remove('hidden');
   downloadUpdateBtn.disabled = false;
   updateInfoDiv.classList.remove('hidden');
-  
+
   // Reset download status message
   if (updateDownloadStatus) {
     updateDownloadStatus.textContent = 'Downloading update...';
     updateDownloadStatus.style.color = '';
   }
-  
+
   updateModal.classList.remove('hidden');
 }
 
@@ -2026,35 +2040,35 @@ async function handleDownloadUpdate() {
     showStatus('❌ Download URL not available', 'error');
     return;
   }
-  
+
   downloadUpdateBtn.disabled = true;
   updateInfoDiv.classList.add('hidden');
   updateDownloadProgress.classList.remove('hidden');
   updateDownloaded.classList.add('hidden'); // Ensure downloaded section is hidden
   updateProgressBar.style.width = '0%';
   updateProgressText.textContent = '0%';
-  
+
   // Reset download status message
   if (updateDownloadStatus) {
     updateDownloadStatus.textContent = 'Downloading update...';
     updateDownloadStatus.style.color = '';
   }
-  
+
   try {
     // Pass the filename from updateInfo if available
     const fileName = currentUpdateInfo.fileName || null;
     const result = await window.electronAPI.downloadUpdate(currentUpdateInfo.downloadUrl, fileName);
-    
+
     if (result.success) {
       // Store the downloaded file path for install & restart
       currentUpdateInfo.downloadedFilePath = result.filePath;
-      
+
       // Update the download status message to show completion
       if (updateDownloadStatus) {
         updateDownloadStatus.textContent = '✅ Update downloaded successfully!';
         updateDownloadStatus.style.color = 'var(--success-color)';
       }
-      
+
       // Wait a moment to show the success message, then switch to downloaded section
       setTimeout(() => {
         updateDownloadProgress.classList.add('hidden');
@@ -2063,7 +2077,7 @@ async function handleDownloadUpdate() {
         openDownloadsBtn.classList.remove('hidden');
         installRestartBtn.classList.remove('hidden');
       }, 500);
-      
+
       showStatus(`✅ Update downloaded to: ${result.fileName}`, 'success');
     } else {
       showStatus(`❌ Download failed: ${result.error}`, 'error');
@@ -2098,15 +2112,15 @@ async function handleInstallAndRestart() {
     showStatus('❌ Downloaded file path not available', 'error');
     return;
   }
-  
+
   const confirmed = confirm('This will close the app, replace the old version, and launch the new version. Continue?');
   if (!confirmed) {
     return;
   }
-  
+
   installRestartBtn.disabled = true;
   installRestartBtn.textContent = 'Installing...';
-  
+
   try {
     const result = await window.electronAPI.installAndRestart(currentUpdateInfo.downloadedFilePath);
     if (result.success) {
@@ -2149,7 +2163,7 @@ window.electronAPI.onDownloadProgress((progress) => {
   const percent = progress.percent || 0;
   updateProgressBar.style.width = `${percent}%`;
   updateProgressText.textContent = `${percent}%`;
-  
+
   // Format file size
   const transferredMB = (progress.transferred / (1024 * 1024)).toFixed(2);
   const totalMB = (progress.total / (1024 * 1024)).toFixed(2);
