@@ -184,6 +184,9 @@ function parseScenarios(data) {
     // Normalize greeting field names - check capitalized and lowercase variations
     normalized.greeting = scenario.Greeting || scenario.greeting || scenario.greetingMessage || '';
 
+    // Normalize description field
+    normalized.description = scenario.Description || scenario.description || '';
+
     // Normalize column/row/buttonIndex field names - check capitalized versions first
     normalized.column = scenario.Column !== undefined ? scenario.Column :
       (scenario.column !== undefined ? scenario.column : undefined);
@@ -505,6 +508,10 @@ function openScenarioModal(column = null, row = null) {
     const greeting = scenario.greeting || '';
     document.getElementById('scenarioGreeting').value = greeting;
 
+    // Description - use normalized field
+    const description = scenario.description || '';
+    document.getElementById('scenarioDescription').value = description;
+
     // Check for missing required fields and show warning (CharacterName and environmentId are optional)
     const missingFields = [];
     if (!scenario.title && !scenario.name) missingFields.push('Title');
@@ -545,6 +552,7 @@ function saveScenario() {
   const environmentId = document.getElementById('scenarioEnvironmentId').value.trim();
   const environmentName = document.getElementById('scenarioEnvironmentName').value.trim();
   const greeting = document.getElementById('scenarioGreeting').value.trim();
+  const description = document.getElementById('scenarioDescription').value.trim();
 
   // Validation - only require essential fields (CharacterName and environmentId are optional)
   if (!title || !characterId || !environmentName || !greeting) {
@@ -584,6 +592,7 @@ function saveScenario() {
       // Backwards compatibility: also check old Environment field
       if (scenario.Environment !== undefined && !scenario.EnvironmentName) clean.EnvironmentName = scenario.Environment;
       if (scenario.Greeting !== undefined) clean.Greeting = scenario.Greeting;
+      if (scenario.Description !== undefined) clean.Description = scenario.Description;
       return clean;
     } else {
       // Keep lowercase fields - remove any normalized fields that were added
@@ -651,7 +660,8 @@ function saveScenario() {
         ButtonIndex: originalScenario.ButtonIndex !== undefined ? originalScenario.ButtonIndex : 0,
         environmentId: environmentId,
         EnvironmentName: environmentName,
-        Greeting: greeting
+        Greeting: greeting,
+        Description: description
       };
       originalScenarios[originalIndex] = updatedScenario;
     } else {
@@ -663,7 +673,8 @@ function saveScenario() {
         characterName,
         environmentId,
         environmentName,
-        greeting
+        greeting,
+        description
       };
       // Preserve column/row/buttonIndex if they exist
       if (originalScenario.column !== undefined) updatedScenario.column = originalScenario.column;
@@ -712,7 +723,8 @@ function saveScenario() {
         ButtonIndex: buttonIndex,
         environmentId: environmentId,
         EnvironmentName: environmentName,
-        Greeting: greeting
+        Greeting: greeting,
+        Description: description
       });
     } else {
       originalScenarios.push({
@@ -723,6 +735,7 @@ function saveScenario() {
         environmentId,
         environmentName,
         greeting,
+        description,
         column: targetColumn,
         row: targetRow,
         buttonIndex: buttonIndex
